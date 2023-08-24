@@ -1,0 +1,40 @@
+# Contributor: Leonardo Arena <rnalrd@alpinelinux.org>
+# Maintainer:  Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=perl-mail-clamav
+_realname=Mail-ClamAV
+pkgver=0.29
+pkgrel=12
+pkgdesc="Perl extension for the clamav virus scanner"
+url="http://search.cpan.org/~converter/Mail-ClamAV-0.29/"
+arch="all"
+license="Unknown"
+depends="perl clamav"
+makedepends="bzip2-dev clamav-dev zlib-dev
+	perl-dev perl-inline perl-inline-c perl-parse-recdescent
+	"
+install=
+subpackages="$pkgname-doc"
+source="http://search.cpan.org/CPAN/authors/id/C/CO/CONVERTER/$_realname-$pkgver.tar.gz"
+
+_builddir="$srcdir/$_realname-$pkgver"
+
+prepare() {
+	cd "$_builddir"
+	sed -i -e 's%\(clamav-config --version\)%sh /usr/bin/\1%' Makefile.PL || return 1
+	PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor || return 1
+}
+
+build() {
+	cd "$_builddir"
+	make -j1 || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install
+        # creates file collision among perl modules
+	find "$pkgdir" -name perllocal.pod -delete
+
+}
+
+sha512sums="e58d846600a3764d4b55eae545754bf187bf77cb0125dbbfc71944c095ddfa4fe11e59888840045c1c72708a729aaa57f89ba91ce3e6c7934013b5a2790a7006  Mail-ClamAV-0.29.tar.gz"

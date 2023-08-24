@@ -1,0 +1,60 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Andrew Manison<amanison@anselsystems.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=mutt
+pkgver=1.9.0
+pkgrel=0
+pkgdesc="a small but very powerful text-mode email client"
+url="http://www.mutt.org"
+arch="all"
+license="GPL"
+makedepends="cyrus-sasl-dev gdbm-dev gettext-dev gpgme-dev
+	libidn-dev ncurses-dev libressl-dev perl"
+options="suid !check"
+subpackages="$pkgname-doc $pkgname-lang"
+source="https://bitbucket.org/$pkgname/$pkgname/downloads/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	ISPELL=/usr/bin/hunspell \
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--enable-imap \
+		--enable-pop \
+		--enable-smtp \
+		--enable-hcache \
+		--enable-gpgme \
+		--enable-sidebar \
+		--with-curses \
+		--with-mailpath=/var/spool/mail \
+		--with-docdir=/usr/share/doc/$pkgname \
+		--without-included-gettext \
+		--with-ssl \
+		--with-sasl
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+
+	rm "$pkgdir"/etc/*.dist \
+		"$pkgdir"/etc/mime.types \
+		"$pkgdir"/usr/bin/muttbug \
+		"$pkgdir"/usr/bin/flea
+
+	# Don't tamper with the global configuration file.
+	# Many options set in the global config cannot be
+	# overwritten in the users configuration file.
+	# Example: Resetting colors isn't possible.
+	install -Dm644 contrib/gpg.rc \
+		"$pkgdir"/etc/Muttrc.gpg.dist
+}
+
+sha512sums="d68b256ba73d19e1fa4594c2f30c5e89f6ce98b34701498cb7179f7f70a9bda4f08eb063e476ef01a7ad9d61cfc12c2528fa3605047dab5ffadd98b955de8b03  mutt-1.9.0.tar.gz"

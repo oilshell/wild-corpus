@@ -1,0 +1,34 @@
+# Contributor: Seung Soo Mun <hamletmun@gmail.com>
+# Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+pkgname=ruby-mini_portile2
+_gemname=${pkgname#ruby-}
+pkgver=2.3.0
+pkgrel=0
+pkgdesc="Simplistic port-like solution for developers"
+url="https://github.com/flavorjones/mini_portile"
+arch="noarch"
+license="MIT"
+depends="ruby"
+source="https://rubygems.org/downloads/$_gemname-$pkgver.gem"
+options="!check"  # FIXME
+
+package() {
+	local gemdir="$pkgdir/$(ruby -rubygems -e 'puts Gem.default_dir')"
+	local geminstdir="$gemdir/gems/$_gemname-$pkgver"
+
+	gem install \
+		--local \
+		--install-dir "$gemdir" \
+		--ignore-dependencies \
+		--no-document \
+		--verbose \
+		"$srcdir"/$_gemname-$pkgver.gem
+
+	rm -rf "$gemdir"/cache \
+		"$geminstdir"/test \
+		"$geminstdir"/*.md \
+		"$geminstdir"/*.txt \
+		"$geminstdir"/*.yml
+}
+
+sha512sums="be2119dc6eeac597254f234b493bdadceff77f0a7ca5e8cbe4b5708bddd4b470b30fb9945b7240dc142b4d3f2a761231db863f71d0274f2bc376fe2808e719ef  mini_portile2-2.3.0.gem"

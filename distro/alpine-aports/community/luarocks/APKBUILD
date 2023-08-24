@@ -1,0 +1,83 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+pkgname=luarocks
+pkgver=2.4.3
+pkgrel=0
+pkgdesc="Deployment and management system for Lua modules"
+url="http://www.luarocks.org/"
+arch="noarch"
+license="MIT"
+depends="curl"
+makedepends=""
+subpackages=""
+triggers=""
+source="http://luarocks.org/releases/$pkgname-$pkgver.tar.gz
+	config.lua"
+builddir="$srcdir/$pkgname-$pkgver"
+
+_lua_versions="5.1 5.2 5.3"
+for _v in $_lua_versions; do
+	makedepends="$makedepends lua$_v-dev"
+	subpackages="$subpackages $pkgname${_v}:_subpackage"
+done
+
+prepare() {
+	default_prepare
+
+	# Create builddir for each Lua version.
+	local lver; for lver in $_lua_versions; do
+		cp -r "$builddir" "$builddir-$lver"
+	done
+}
+
+build() {
+	local lver; for lver in $_lua_versions; do
+		msg "Building for Lua $lver..."
+		cd "$builddir-$lver"
+
+		./configure \
+			--prefix=/usr \
+			--sysconfdir=/etc/luarocks \
+			--rocks-tree=/usr/local \
+			--lua-version="$lver" \
+			--lua-suffix="$lver" \
+			--with-lua-include="$(pkg-config --variable=includedir lua$lver)" \
+			--with-lua-lib="$(pkg-config --variable=libdir lua$lver)" \
+			--with-downloader=curl \
+			--with-md5-checker=md5sum \
+			--versioned-rocks-dir
+		make
+	done
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_subpackage() {
+	local lver="${subpkgname#$pkgname}"
+	pkgdesc="Deployment and management system for Lua $lver modules"
+	install_if="lua$lver $pkgname=$pkgver-r$pkgrel"
+	depends="lua$lver"
+	triggers="$subpkgname.trigger=/usr/lib/luarocks/rocks-$lver/*"
+
+	cd "$builddir-$lver"
+
+	make install DESTDIR="$subpkgdir"
+
+	# Remove default script names which conflict per Lua version.
+	rm "$subpkgdir"/usr/bin/luarocks \
+		"$subpkgdir"/usr/bin/luarocks-admin
+
+	# Set the correct Lua version.
+	sed -i "s/env lua/env lua${lver}/" \
+		"$subpkgdir"/usr/bin/luarocks-$lver \
+		"$subpkgdir"/usr/bin/luarocks-admin-$lver
+
+	# Config based on:
+	#   https://github.com/luarocks/luarocks/wiki/Integrating-distro-modules-with-LuaRocks
+	install -D -m 644 "$srcdir"/config.lua "$subpkgdir"/etc/$pkgname/config-$lver.lua
+}
+
+sha512sums="a4efe19e650772594db107218422333d462a843561f37787744244d359bb6337dfbcfd143f5f7c407725409f54754f3bf7552423cbb31c4633d9960af1d2f9bf  luarocks-2.4.3.tar.gz
+c41bf3f8491e25d69ce0fee379203cc3721f2c79bb9ff652488aa2d66bc1e4613bd59d331cf17b9f18521d4f63539ce946b6a39038dc844083463c2c96f71811  config.lua"

@@ -1,0 +1,41 @@
+# Contributor: V.Krishn <vkrishn4@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libwebsockets
+pkgver=2.3.0
+pkgrel=0
+pkgdesc="C library for lightweight websocket clients and servers"
+url="http://libwebsockets.org"
+arch="all"
+license="LGPL2.1"
+makedepends="cmake zlib-dev libressl-dev"
+subpackages="$pkgname-doc $pkgname-dev $pkgname-test:_test"
+source="$pkgname-$pkgver.tar.gz::https://github.com/warmcat/$pkgname/archive/v$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	mkdir -p "$builddir"/build
+	cd "$builddir"/build
+
+	cmake .. \
+		-DCMAKE_BUILD_TYPE=MinSizeRel \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_VERBOSE_MAKEFILE=TRUE
+	make
+}
+
+package() {
+	cd "$builddir"
+
+	install -Dm644 LICENSE \
+		"$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+	make -C build DESTDIR="$pkgdir" install
+}
+
+_test() {
+	pkgdesc="$pkgdesc (test server)"
+
+	mkdir -p "$subpkgdir"/usr
+	mv "$pkgdir"/usr/share "$pkgdir"/usr/bin "$subpkgdir"/usr/
+}
+
+sha512sums="28e11c49283fcfc0673e1f59e5fc523784fa953d71fbfc8afb40fe4a7041dc5fbc689a97c95eff5a1397a67d28b698245e49444413c83e637893767372c06e61  libwebsockets-2.3.0.tar.gz"

@@ -1,0 +1,40 @@
+# Contributor: ScrumpyJack <scrumpyjack@st.ilet.to>
+# Maintainer: ScrumpyJack <scrumpyjack@st.ilet.to>
+pkgname=fvwm
+pkgver=2.6.7
+pkgrel=0
+pkgdesc="FVWM is a powerful desktop window manager for the X  Window system"
+url="http://fvwm.org"
+arch="all"
+license="GPL2"
+depends=""
+depends_dev=""
+makedepends="perl libxslt libxcursor-dev libx11-dev freetype-dev fontconfig-dev
+	gettext-dev libxft-dev libxt-dev libxext-dev libpng-dev libxpm-dev"
+install=""
+subpackages="$pkgname-doc $pkgname-lang"
+source="https://github.com/fvwmorg/fvwm/releases/download/$pkgver/$pkgname-$pkgver.tar.gz"
+
+builddir=$srcdir/${pkgname}-${pkgver}
+
+build() {
+	cd "$builddir"
+	./configure --prefix=/usr \
+		--disable-perllib \
+		--disable-bidi \
+		--disable-rsvg \
+		--disable-xinerama
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+        make DESTDIR="$pkgdir" install
+}
+
+sha512sums="127cd1cc68e98e673056c1dd5108dfabc7560cfc98c86e35b95d75c6327156389f77aa0470e2e6f702865367f29d3bd1cfa8cf07a5b1c1693fa6e04fb2af717f  fvwm-2.6.7.tar.gz"

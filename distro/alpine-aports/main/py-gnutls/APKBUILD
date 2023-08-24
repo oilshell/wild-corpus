@@ -1,0 +1,42 @@
+# Contributor: Francesco Colista <fcolista@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=py-gnutls
+_pkgname=python-gnutls
+pkgver=3.1.1
+pkgrel=0
+pkgdesc="Python wrapper for the GNUTLS library"
+url="http://pypi.python.org/pypi/python-gnutls"
+arch="noarch"
+license="PSF"
+makedepends="python2-dev gnutls-dev py-setuptools"
+install=""
+subpackages="py2-${pkgname/py-/}:_py2"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+
+builddir=${srcdir}/${_pkgname}-${pkgver}
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py() {
+	local python=$1
+	pkgdesc="$pkgdesc - $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+_py2() {
+	_py python2
+	replaces="$pkgname"
+}
+
+md5sums="c8bcb2b2ded61216b3b6003fc52041ee  python-gnutls-3.1.1.tar.gz"
+sha256sums="8892681519a89adb5bb1fba62199bb83bb86c999c983d46edf306f13c5f99a59  python-gnutls-3.1.1.tar.gz"
+sha512sums="471127d548cc4f44fb7b2da4d6db23cff66378b45eefde2ea4950ee08d849b1a5aed86245cd2a8a5f46fd53c652d433d23b658184a00e8e5514da3f518a080ab  python-gnutls-3.1.1.tar.gz"

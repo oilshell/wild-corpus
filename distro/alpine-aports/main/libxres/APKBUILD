@@ -1,0 +1,37 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libxres
+pkgver=1.0.7
+pkgrel=1
+pkgdesc="X11 Resource extension library"
+url="http://xorg.freedesktop.org"
+arch="all"
+license="custom"
+options="!check"  # No test suite.
+subpackages="$pkgname-dev $pkgname-doc"
+depends=
+depends_dev="resourceproto"
+makedepends="$depends_dev libx11-dev libxext-dev util-macros xproto"
+source="http://www.x.org/releases/individual/lib/libXres-$pkgver.tar.bz2
+	"
+
+builddir="$srcdir"/libXres-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	install -D -m644 COPYING "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+md5sums="45ef29206a6b58254c81bea28ec6c95f  libXres-1.0.7.tar.bz2"
+sha256sums="26899054aa87f81b17becc68e8645b240f140464cf90c42616ebb263ec5fa0e5  libXres-1.0.7.tar.bz2"
+sha512sums="796a79ab694317910442cb10a936711df9dde95764eef11efb8dedc85114977e56409de2f640553f1ad492325df178b8cfbeaeec3f03bf084638c555e44292e0  libXres-1.0.7.tar.bz2"

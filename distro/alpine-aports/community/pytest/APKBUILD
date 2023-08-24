@@ -1,0 +1,57 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=pytest
+pkgver=3.2.2
+pkgrel=0
+pkgdesc="A python test library"
+url="http://pytest.org"
+arch="noarch"
+license="MIT"
+depends="py3-$pkgname"
+makedepends="python2-dev py-setuptools python3-dev"
+subpackages="py3-$pkgname:_py3 py2-$pkgname:_py2"
+source="https://files.pythonhosted.org/packages/source/${pkgname:0:1}/$pkgname/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"/usr/bin
+
+	local name; for name in py.test pytest; do
+		ln -s $name-3 "$pkgdir"/usr/bin/$name || return 1
+	done
+}
+
+_py2() {
+	replaces="$pkgname"
+	depends="py2-py"
+	_py python2
+}
+
+_py3() {
+	depends="py3-py"
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	local pyver="${1:6:1}"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+
+	# Add version suffix to executable files.
+	local path; for path in "$subpkgdir"/usr/bin/*; do
+		mv "$path" "$path-$pyver" || return 1
+	done
+}
+
+sha512sums="6df3a50e7d1efeaf7a283920b16d1daf800798f422bc851b0aacd2bbd5cb0a88c95f9057fae49943b9dfe6527ed552cdf8d983b944ab91d0af252ee4f6eb82db  pytest-3.2.2.tar.gz"

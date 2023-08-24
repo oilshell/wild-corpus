@@ -1,0 +1,31 @@
+# Contributor: Paul Onyschuk <blink@bojary.koba.pl>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=fossil
+pkgver=2.3
+pkgrel=0
+pkgdesc="Simple, high-reliability, distributed software configuration management"
+url="http://www.fossil-scm.org"
+arch="all"
+license="BSD"
+depends=""
+makedepends="libressl-dev zlib-dev sqlite-dev"
+source="http://www.fossil-scm.org/index.html/uv/$pkgname-src-$pkgver.tar.gz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--json \
+		--disable-internal-sqlite
+	make TCC="${CC:-gcc} $CFLAGS"
+}
+
+package() {
+	cd "$builddir"
+	install -Dm 755 $pkgname "$pkgdir"/usr/bin/$pkgname
+}
+
+sha512sums="41f87a9f79b87895b1972d2866b27205da34076eb35200b60fd38f1921162bf9099a71caac4063c04b919484208b39c7184dff661dc0b5ca7716d8edd11462cc  fossil-src-2.3.tar.gz"

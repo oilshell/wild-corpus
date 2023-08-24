@@ -1,0 +1,55 @@
+# Contributor: Adrian Siekierka <kontakt@asie.pl>
+# Maintainer: Adrian Siekierka <kontakt@asie.pl>
+pkgname=openttd
+pkgver=1.7.0
+pkgrel=0
+pkgdesc="Open source simulation game based upon Transport Tycoon Deluxe"
+url="http://openttd.org/"
+arch="all"
+license="GPL2"
+depends=""
+makedepends="libpng-dev zlib-dev sdl-dev lzo-dev xz-dev freetype-dev fontconfig-dev"
+subpackages="$pkgname-doc $pkgname-lang::noarch"
+source="https://binaries.openttd.org/releases/$pkgver/$pkgname-$pkgver-source.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	# OpenTTD's builtin strip does not work when cross-compiling,
+	# but it will be done automatically later in the package build.
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--disable-strip \
+		--prefix-dir=/usr \
+		--binary-dir=bin \
+		--install-dir="${pkgdir}" \
+		--with-sdl \
+		--with-zlib \
+		--with-liblzma \
+		--with-liblzo2 \
+		--with-freetype \
+		--with-fontconfig \
+		--without-icu \
+	make
+}
+
+package() {
+	cd "$builddir"
+	make install
+}
+
+lang() {
+	pkgdesc="$pkgdesc (localizations)"
+
+	cd "$pkgdir"
+	mkdir -p "$subpkgdir"/usr/share/games/openttd/lang
+
+	local i
+	for i in $(find usr/share/games/openttd/lang/ ! -name 'english.lng' -type f); do
+		mv "$i" "$subpkgdir"/"$i"
+	done
+}
+
+sha512sums="561d76488ba0e7798971fef096d6fd161a8a43c733dfd7b37361fa209138fdffb900d591e2d0df58e67cd544cd1151ae976f47956891322dbb3cc1ad1882d931  openttd-1.7.0-source.tar.xz"

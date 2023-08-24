@@ -1,0 +1,143 @@
+#!/bin/bash
+{
+	#////////////////////////////////////
+	# DietPi RAMDISK Script
+	#
+	#////////////////////////////////////
+	# Created by Daniel Knight / daniel.knight@dietpi.com / dietpi.com
+	#
+	#////////////////////////////////////
+	#
+	# Info:
+	# - Copies dietpi files from /boot to /DietPi (ram)
+	# - /DietPi is mounted as tmpfs (ram)
+	# - This allows us to vastly reduce filesystem IO across DietPi.
+	# - Creates a file when active (/DietPi/.ramdisk)
+	#
+	# Usage:
+	# - Called from /DietPi/dietpi/conf/dietpi-service
+	# - /DietPi/dietpi/dietpi-ramdisk 0				= Copy from /boot (disk) to /DietPi (ram)
+	# - /DietPi/dietpi/dietpi-ramdisk 1				= Copy from /DietPi (ram) to /boot (disk)
+	#////////////////////////////////////
+
+	#Force en_GB Locale for whole script. Prevents incorrect parsing with non-english locales.
+	LANG=en_GB.UTF-8
+
+	#Ensure we are in users home dir: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298223705
+	cd "$HOME"
+
+	INPUT=0
+
+	if [[ $1 =~ ^-?[0-9]+$ ]]; then
+
+		INPUT=$1
+
+	fi
+
+	#Import DietPi-Globals ---------------------------------------------------------------
+	#. /DietPi/dietpi/func/dietpi-globals # Not compatible until dietpi-boot.service
+	#Import DietPi-Globals ---------------------------------------------------------------
+
+	FILEPATH_RAM="/DietPi"
+	FILEPATH_DISK="/boot"
+
+	#List of ini/config files located in /boot
+	aFILE_BOOT_INI=(
+		'dietpi.txt'
+		'config.txt'
+		'boot.ini'
+		'uEnv.txt'
+	)
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#Main Loop
+	#/////////////////////////////////////////////////////////////////////////////////////
+
+	#Start: Copy to Ram
+	if (( $INPUT == 0 )); then
+
+		if [ ! -f /DietPi/.ramdisk ]; then
+
+			echo -e "$(date) | DietPi-Ramdisk: Starting"
+
+			#Generate required directories
+			mkdir -p "$FILEPATH_RAM"/dietpi
+			mkdir -p "$FILEPATH_RAM"/dietpi/conf
+			mkdir -p "$FILEPATH_RAM"/dietpi/func
+			mkdir -p "$FILEPATH_RAM"/dietpi/misc
+
+			#Copy array of /boot/* files to RAM (config/ini etc)
+			for ((i=0; i<${#aFILE_BOOT_INI[@]}; i++))
+			do
+
+				if [ -f "$FILEPATH_DISK/${aFILE_BOOT_INI[$i]}" ]; then
+
+					cp "$FILEPATH_DISK"/${aFILE_BOOT_INI[$i]} "$FILEPATH_RAM"/
+
+					# - Convert line endings to Unix from Dos. Prevents various issues where users modify file on another system, then save with dos line endings: https://github.com/Fourdee/DietPi/issues/390
+					sed -i $'s/\r$//' "$FILEPATH_RAM"/${aFILE_BOOT_INI[$i]}
+
+				fi
+
+			done
+
+			#/boot/dietpi folder
+			cp -Rf "$FILEPATH_DISK"/dietpi "$FILEPATH_RAM"/
+
+			#Set execute
+			chmod -R +x "$FILEPATH_RAM"
+
+			#Generate active flag
+			echo -e "0" > /DietPi/.ramdisk
+
+			echo -e "$(date) | DietPi-Ramdisk: Completed"
+
+		else
+
+			echo -e "$(date) | DietPi-Ramdisk: Already running"
+
+		fi
+
+	#Stop: Copy everything back to DISK
+	elif (( $INPUT == 1 )); then
+
+		echo -e "$(date) | DietPi-Ramdisk: Stopping"
+
+		if [ -f /DietPi/.ramdisk ]; then
+
+			if [ ! -f /DietPi/dietpi/boot ]; then #Only copy back if file exists (in-case "DietPi-Ramdisk: Already running" occured during start): https://github.com/Fourdee/DietPi/issues/719#issuecomment-276101472
+
+				echo -e "$(date) | DietPi-Ramdisk: Error - /DietPi/dietpi/boot is missing, aborting..."
+
+			else
+
+				#Remove all of DietPi files and folders from DISK
+				# rm -R "$FILEPATH_DISK"/dietpi #: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298241622
+
+				#Copy DietPi to Disk with files from RAM
+				cp -Rf "$FILEPATH_RAM"/* /boot/
+
+				#remove active flag.
+				rm /DietPi/.ramdisk &> /dev/null
+
+			fi
+
+			echo -e "$(date) | DietPi-Ramdisk: Completed"
+
+		else
+
+			echo -e "$(date) | DietPi-Ramdisk: Is not currently running"
+
+		fi
+	fi
+
+	#Sync changes to disk NOW
+	sync
+
+	#-----------------------------------------------------------------------------------
+	#delete[]
+	unset aFILE_BOOT_INI
+	#-----------------------------------------------------------------------------------
+	exit
+	#-----------------------------------------------------------------------------------
+}

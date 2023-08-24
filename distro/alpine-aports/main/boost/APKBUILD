@@ -1,0 +1,149 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=boost
+pkgver=1.62.0
+_pkgver="${pkgver//./_}"
+pkgrel=5
+pkgdesc="Free peer-reviewed portable C++ source libraries"
+url="http://www.boost.org/"
+arch="all"
+license="custom"
+depends=""
+depends_dev="linux-headers"
+makedepends="$depends_dev python2-dev>=2.6 python3-dev flex bison bzip2-dev zlib-dev"
+subpackages="$pkgname-dev $pkgname-doc"
+source="http://downloads.sourceforge.net/$pkgname/${pkgname}_$_pkgver.tar.bz2
+	libressl.patch
+	boost-1.57.0-python-abi_letters.patch
+	boost-1.57.0-python-libpython_dep.patch
+	dual-python.patch
+	"
+builddir="$srcdir/${pkgname}_${_pkgver}"
+
+_libs="date_time
+	filesystem
+	graph
+	iostreams
+	math
+	prg_exec_monitor
+	program_options
+	python3
+	python
+	random
+	regex
+	serialization
+	signals
+	system
+	thread
+	unit_test_framework
+	wave
+	wserialization
+	"
+for _lib in $_libs; do
+	subpackages="$subpackages $pkgname-$_lib:_boostlib"
+done
+
+prepare() {
+	default_prepare || return 1
+
+	cd "$builddir"
+
+	PY2_VERSION="$(_pyversion python2)"
+	PY3_VERSION="$(_pyversion python3)"
+	abiflags=$(python3-config --abiflags)
+
+
+	# create user-config.jam
+	cat > user-config.jam <<-__EOF__
+
+	using gcc : : $CC : <cxxflags>"${CXXFLAGS}" <linkflags>"${LDFLAGS}" ;
+	using python : ${PY2_VERSION} : /usr/bin/python2 : /usr/include/python${PY2_VERSION} : : : : ;
+	using python : ${PY3_VERSION} : /usr/bin/python3 : /usr/include/python${PY3_VERSION}m : : : : $abiflags ;
+
+	__EOF__
+}
+
+case "$CARCH" in
+	armhf|aarch64) _boostarch=arm ;;
+	ppc64*) _boostarch=ppc ;;
+	s390x) _boostarch=s390 ;;
+	*) _boostarch=$CARCH ;;
+esac
+_enginedir=tools/build/src/engine
+_bjam="${builddir}/$_enginedir/bin.linux${_boostarch}/bjam"
+[ "$_boostarch" = "s390" ] && _bjam="${builddir}/$_enginedir/bin.linux390/bjam" && \
+	_options_s390="--without-context --without-coroutine --without-coroutine2"
+
+_options="--user-config=\"$builddir/user-config.jam\"
+	--prefix=\"$pkgdir/usr\"
+	release
+	debug-symbols=off
+	threading=single,multi
+	runtime-link=shared
+	link=shared,static
+	cflags=-fno-strict-aliasing
+	-sPYTHON_ROOT=/usr
+	-sPYTHON_VERSION=$PY2_VERSION
+	-sTOOLS=gcc
+	--layout=tagged
+	-q
+	-j${JOBS:-2}
+	${_options_s390}
+	"
+
+build() {
+	export BOOST_ROOT="$builddir"
+
+	msg "Building bjam"
+	cd "$builddir"/$_enginedir
+	CC= ./build.sh cc || return 1
+
+	msg "Building bcp"
+	cd "$builddir"/tools/bcp
+	"$_bjam" -j${JOBS:-2} || return 1
+
+	msg "Building boost"
+	cd "$builddir"
+	"$_bjam" $_options
+}
+
+package() {
+	export BOOST_ROOT="$builddir"
+	cd "$builddir"
+
+	install -Dm755 $_bjam \
+		"$pkgdir"/usr/bin/bjam || return 1
+
+	install -Dm755 dist/bin/bcp "$pkgdir"/usr/bin/bcp || return 1
+
+	install -Dm644 LICENSE_1_0.txt \
+		"$pkgdir"/usr/share/licenses/$pkgname/LICENSE_1_0.txt || return 1
+
+	"$pkgdir"/usr/bin/bjam $_options \
+		--includedir="$pkgdir"/usr/include \
+		--libdir="$pkgdir"/usr/lib \
+		install || return 1
+
+	cd libs/python/pyste/install
+	python2 setup.py install --root="$pkgdir" || return 1
+}
+
+_boostlib() {
+	local name="${subpkgname#$pkgname-}"
+	pkgdesc="Boost $name library"
+	case "$name" in
+	python*) depends="$depends $name"
+	esac
+
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/libboost_$name* "$subpkgdir"/usr/lib/
+}
+
+_pyversion() {
+	$1 -c 'import sys; print("%i.%i" % (sys.version_info.major, sys.version_info.minor))'
+}
+
+sha512sums="5385ae3d5255a433a704169ad454d8dc2b0b5bcae3fb23defd6570df4ff7d845cf9fcbeebccdc1c5db0eec9f82ee3d90040de9507c8167467c635d3b215463be  boost_1_62_0.tar.bz2
+5804c344b5e5ece17811e744f1965c58840b6695a084dd09c23c9db380f3cbfbca201d6c595b5379bc12ff6f285794509799d28864df6037db6212c63adb2207  libressl.patch
+d96d4d37394a31764ed817d0bc4a99cffa68a75ff1ecfd4417b9e1e5ae2c31a96ed24f948c6f2758ffdac01328d2402c4cf0d33a37107e4f5f721e636daebd66  boost-1.57.0-python-abi_letters.patch
+132c4b62815d605c2d3c9038427fa4f422612a33711d47b2862f2311516af8a371d6b75bf078a7bffe20be863f8d21fb9fe74dc1a1bac3a10d061e9768ec3e02  boost-1.57.0-python-libpython_dep.patch
+de0d59b19f0a16a747b66833d399c62fa50a1f8baa68bd98195cc718d220ca98219a8a4b083c1962054a5d0299d0afdd83c0d2b54d8d457e37c34a9c05591265  dual-python.patch"

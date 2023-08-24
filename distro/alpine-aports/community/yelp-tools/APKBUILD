@@ -1,0 +1,28 @@
+# Contributor: Alan Lacerda <alacerda@alpinelinux.org>
+# Maintainer: Alan Lacerda <alacerda@alpinelinux.org>
+pkgname=yelp-tools
+pkgver=3.18.0
+pkgrel=0
+pkgdesc="Small programs that help you create, edit, manage, and publish your Mallard or DocBook documentation"
+url="https://wiki.gnome.org/Apps/Yelp/Tools"
+arch="noarch"
+license="GPL/LGPL"
+makedepends="gawk yelp-xsl itstool libxml2-utils libxslt"
+source="https://download.gnome.org/sources/$pkgname/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="75957b06bdade966a33a41ecc68dfa3eb3b3e3550dc8c6664ee694c4b043c8b45a2403dd23c9810347ed7234ceb5389a34133554de012a7e0afc5db891525fb8  yelp-tools-3.18.0.tar.xz"

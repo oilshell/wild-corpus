@@ -1,0 +1,42 @@
+# Contributor: Andy Postnikov <apostnikov@gmail.com>
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Contributor: Fabio Ribeiro <fabiorphp@gmail.com>
+# Maintainer: Andy Postnikov <apostnikov@gmail.com>
+pkgname=php7-xdebug
+_pkgname=xdebug
+pkgver=2.5.5
+pkgrel=0
+_phpver=${pkgname#php}
+_phpver=${_phpver%%-*}
+pkgdesc="PHP$_phpver extension that provides functions for function traces and profiling"
+url="http://pecl.php.net/package/xdebug"
+arch="all"
+license="PHP"
+depends="php$_phpver-common"
+makedepends="php$_phpver-dev autoconf"
+source="$pkgname-$pkgver.tgz::http://pecl.php.net/get/$_pkgname-$pkgver.tgz"
+options="!check"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	phpize$_phpver
+	./configure --prefix=/usr --with-php-config=php-config$_phpver
+	make
+}
+
+package() {
+	local confdir="$pkgdir/etc/php$_phpver/conf.d"
+	cd "$builddir"
+
+	make INSTALL_ROOT="$pkgdir" install
+
+	mkdir -p "$confdir"
+	cat > "$confdir"/$_pkgname.ini <<-EOF
+		; Uncomment to enable this extension.
+		;zend_extension=$_pkgname.so
+	EOF
+}
+
+sha512sums="9faab421bd90c03734c047d8c6dcc021c8bc665eb36781c692f194d04c7dca24fe1eb920ca8dc407e5bf4ae0912c4b917587f940f34b07171a8881d4cf8695d1  php7-xdebug-2.5.5.tgz"

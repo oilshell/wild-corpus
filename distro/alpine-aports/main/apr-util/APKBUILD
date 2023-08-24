@@ -1,0 +1,61 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=apr-util
+pkgver=1.5.4
+pkgrel=3
+pkgdesc="The Apache Portable Runtime Utility Library"
+url="http://apr.apache.org/"
+arch="all"
+license="ASL 2.0"
+depends=
+subpackages="$pkgname-dev $pkgname-dbm_db $pkgname-dbd_pgsql
+	$pkgname-dbd_sqlite3 $pkgname-ldap"
+
+depends_dev="expat-dev apr-dev openldap-dev sqlite-dev postgresql-dev
+	db-dev libressl-dev"
+makedepends="$depends_dev bash chrpath libressl"
+source="http://www.apache.org/dist/apr/$pkgname-$pkgver.tar.bz2"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--with-apr=/usr \
+		--with-ldap \
+		--with-pgsql \
+		--with-sqlite3 \
+		--with-berkeley-db \
+		--with-crypto \
+		--with-openssl \
+		--without-sqlite2 \
+		--without-gdbm \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	rm "$pkgdir"/usr/lib/*.exp || return 1
+	chrpath -d "$pkgdir"/usr/lib/*.so.* || return 1
+}
+
+_mv_mod() {
+	pkgdesc="The Apache Portable Runtime Utility Library - $2 driver"
+	depends=
+	local _moddir="usr/lib/apr-util-1"
+	mkdir -p "$subpkgdir"/$_moddir
+	mv "$pkgdir"/$_moddir/apr_$1*.so "$subpkgdir"/$_moddir/
+}
+
+dbm_db() { _mv_mod dbm_db "Berkley DB"; }
+dbd_pgsql() { _mv_mod dbd_pgsql "PostgreSQL"; }
+dbd_mysql() { _mv_mod dbd_mysql "MySQL"; }
+dbd_sqlite3() { _mv_mod dbd_sqlite "SQLite3"; }
+ldap() { _mv_mod ldap "LDAP"; }
+
+md5sums="2202b18f269ad606d70e1864857ed93c  apr-util-1.5.4.tar.bz2"
+sha256sums="a6cf327189ca0df2fb9d5633d7326c460fe2b61684745fd7963e79a6dd0dc82e  apr-util-1.5.4.tar.bz2"
+sha512sums="ca877d8e444218c4ba0f28063ee075ddcd6c0a487b692dc80ef442fe775ec4eeb337c6957853772e8082e27edcb450d7e909c2c6c3ab4a95bbf0a5ee5ea4a2d1  apr-util-1.5.4.tar.bz2"

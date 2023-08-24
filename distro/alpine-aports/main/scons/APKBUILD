@@ -1,0 +1,25 @@
+# Contributor: William Pitcock <nenolod@dereferenced.org>
+# Maintainer: William Pitcock <nenolod@dereferenced.org>
+pkgname=scons
+pkgver=3.0.0
+pkgrel=0
+pkgdesc="scons software construction system"
+url="http://www.scons.org/"
+arch="noarch"
+license="MIT"
+depends="python3"
+makedepends="python3-dev"
+source="http://downloads.sourceforge.net/$pkgname/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python3 setup.py build
+}
+
+package() {
+	cd "$builddir"
+	python3 setup.py install --prefix=/usr --root="$pkgdir"
+}
+
+sha512sums="e52c31a21f8aab4bbb684a8770cbcb9eeef042d5c8c86ea2f4beb64ec0c50bc1ca4aa738a2bf92330bd26f8fa9589cb10314dc53defccc2825a5a13b01641b2d  scons-3.0.0.tar.gz"

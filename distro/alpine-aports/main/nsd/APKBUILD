@@ -1,0 +1,54 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Contributor: Matt Smith <mcs@darkregion.net>
+# Contributor: Leonardo Arena <rnalrd@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=nsd
+pkgver=4.1.15
+pkgrel=2
+pkgdesc="NSD is an authoritative only, high performance, simple and open source name server."
+url="http://www.nlnetlabs.nl/projects/nsd/"
+arch="all"
+license="BSD"
+depends=""
+depends_dev=
+makedepends="$depends_dev libressl-dev libevent-dev"
+install="$pkgname.pre-install $pkgname.pre-upgrade"
+subpackages="$pkgname-doc $pkgname-dbg"
+pkgusers="nsd"
+pkggroups="nsd"
+source="http://www.nlnetlabs.nl/downloads/$pkgname/$pkgname-$pkgver.tar.gz
+	nsd.initd
+	"
+
+builddir="$srcdir/$pkgname-$pkgver"
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--sbindir=/usr/sbin \
+		--mandir=/usr/share/man \
+		--with-user=nsd \
+		--with-pidfile=/var/run/nsd/nsd.pid \
+		--with-xfrdir=/var/db/nsd \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+
+	install -m755 -D "$srcdir"/$pkgname.initd \
+		"$pkgdir"/etc/init.d/$pkgname || return 1
+
+	install -d "$pkgdir"/usr/share/doc/$pkgname
+	cp -a "$builddir"/doc/* "$builddir"/contrib \
+		"$pkgdir"/usr/share/doc/$pkgname/
+
+	chown nsd.nsd "$pkgdir"/var/db/nsd || return 1
+	rm -fr "$pkgdir"/var/run || return 1
+}
+
+sha512sums="1011e4805d43931dd1a7fed230dadd9eb9bdf7a6728cb5bbde2def462d3bdc2ed79529ef0c60a6530e6fb78ae88a03a50d8b75b27d9130966ca20a62d8a6615e  nsd-4.1.15.tar.gz
+0425f606bf102175adab6d198aeb692872576f9c0bfce11b9d9e4145595b4902e5ef3fe2c3ae5d832308f43282618494b8dd27eb76658e79df85cc7798008722  nsd.initd"

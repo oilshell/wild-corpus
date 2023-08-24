@@ -1,0 +1,49 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-voluptuous
+_pkgname=voluptuous
+pkgver=0.10.5
+pkgrel=0
+pkgdesc="A Python data validation library"
+url="https://github.com/alecthomas/voluptuous"
+arch="noarch"
+license="MIT"
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$_pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+	# fix permissions
+	chmod a+r -R \
+		"$subpkgdir"/usr/lib/python*/site-packages/voluptuous-${pkgver}-py*.egg-info \
+		|| return 1
+}
+
+sha512sums="2024121c56a91cc3bf5102ca68f8347461b2041da9a352eade0e0ce3657d9a477a60a7a5823e8f3628eee7b327840b5c4eba13c106ea49ea91a553d6b5edd363  voluptuous-0.10.5.tar.gz"

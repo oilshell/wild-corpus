@@ -1,0 +1,62 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-paramiko
+_pkgname=paramiko
+pkgver=2.3.1
+pkgrel=0
+pkgdesc="An SSH2 protocol library for Python"
+url="https://github.com/paramiko/paramiko/"
+arch="noarch"
+license="LGPL2+"
+depends="py-asn1 py-cryptography py-bcrypt py-pynacl"
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="$pkgname-doc $pkgname-demos py3-$_pkgname:_py3 py2-$_pkgname:_py2"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc ${python#python}"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	depends="${depends//py-/py2-}"
+	_py python2
+}
+
+_py3() {
+	depends="${depends//py-/py3-}"
+	_py python3
+}
+
+demos() {
+	pkgdesc="$pkgdesc (demos)"
+
+	mkdir -p "$subpkgdir"/usr/share/doc/"$pkgname"/demos || return 1
+	mv "$builddir"/demos "$subpkgdir"/usr/share/doc/"$pkgname"/ || return 1
+}
+
+doc() {
+	pkgdesc="$pkgdesc (documentation)"
+
+	mkdir -p "$subpkgdir"/usr/share/doc/"$pkgname"/docs || return 1
+	mv "$builddir"/docs "$subpkgdir"/usr/share/doc/"$pkgname"/ || return 1
+}
+
+sha512sums="6635f704bb26ccda10633df2b67366ed6c1647b9cbed2eb7a9fbd1c53f019e635231b3d35be63f84668871f2ff083461791a505f7a80cd5cc238d836a64804d4  paramiko-2.3.1.tar.gz"

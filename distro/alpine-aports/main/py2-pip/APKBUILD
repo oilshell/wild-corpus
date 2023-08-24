@@ -1,0 +1,31 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+# Note: Python 3 already includes pip, so py3-pip is not needed.
+pkgname=py2-pip
+_pkgname=pip
+pkgver=9.0.1
+pkgrel=1
+pkgdesc="A tool for installing and managing Python packages"
+url="http://www.pip-installer.org"
+arch="noarch"
+license="MIT"
+provides="py-pip=$pkgver-r$pkgrel"
+replaces="py-pip"
+depends="python2 py-setuptools"
+makedepends="python2-dev py-setuptools"
+source="$pkgname-$pkgver.tar.gz::https://github.com/pypa/pip/archive/$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+}
+
+package() {
+	cd "$builddir"
+	python2 setup.py install --prefix=/usr --root="$pkgdir" || return 1
+}
+
+md5sums="ae605ab1ccdcb7f9e219a400b4bc68b6  py2-pip-9.0.1.tar.gz"
+sha256sums="d03fabbc4fbf2fbfc2f97307960aef2b3ca4c880ecda993dcc35957e33d7cd76  py2-pip-9.0.1.tar.gz"
+sha512sums="1654158f7ca358567c2dab4ff5898a017d5895d34817650e50f7ab8cee8d0b67b27c03aaee58ed33c869587cfd9a4abe5397b37e4f037af1a1502cbf3e23b573  py2-pip-9.0.1.tar.gz"

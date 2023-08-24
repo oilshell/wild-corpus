@@ -1,0 +1,36 @@
+# Maintainer: William Pitcock <nenolod@dereferenced.org>
+pkgname=gnome-backgrounds
+pkgver=3.26.1
+pkgrel=0
+pkgdesc="backgrounds for the GNOME desktop environment"
+url="http://www.gnome.org/"
+arch="noarch"
+license="GPL"
+makedepends="gnome-desktop-dev"
+subpackages="$pkgname-lang"
+source="http://ftp.gnome.org/pub/GNOME/sources/$pkgname/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="2b8a62edafc610c3280a2c2d1be52f2c3d9c47d6443f676cde365a03fd75dbf30385b6db0602f58e8833235ccfe8574e23b4fd6fc41dfeb8426dd934aecd5b77  gnome-backgrounds-3.26.1.tar.xz"

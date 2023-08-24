@@ -1,0 +1,58 @@
+# Simple 2x2x2 cube model, with colored faces, which auto-compiles to a display list
+
+Cube_InitGfx() {
+	glNewList Cube GL_COMPILE
+	glBegin GL_QUADS
+
+	# Top
+	glNormal 0 1 0
+	glTexCoord 1 1; glVertex 1 1 1
+	glTexCoord 1 0; glVertex 1 1 -1
+	glTexCoord 0 0; glVertex -1 1 -1
+	glTexCoord 0 1; glVertex -1 1 1
+
+	# Right
+	glNormal 1 0 0
+	glTexCoord 1 0; glVertex 1 1 -1
+	glTexCoord 1 1; glVertex 1 1 1
+	glTexCoord 0 1; glVertex 1 -1 1
+	glTexCoord 0 0; glVertex 1 -1 -1
+
+	# Front
+	glNormal 0 0 1
+	glTexCoord 1 1; glVertex 1 1 1
+	glTexCoord 0 1; glVertex -1 1 1
+	glTexCoord 0 0; glVertex -1 -1 1
+	glTexCoord 1 0; glVertex 1 -1 1
+
+	# Bottom
+	glNormal 0 -1 0
+	glTexCoord 1 1; glVertex 1 -1 1
+	glTexCoord 0 1; glVertex -1 -1 1
+	glTexCoord 0 0; glVertex -1 -1 -1
+	glTexCoord 1 0; glVertex 1 -1 -1
+
+	# Left
+	glNormal -1 0 0
+	glTexCoord 1 1; glVertex -1 1 1
+	glTexCoord 1 0; glVertex -1 1 -1
+	glTexCoord 0 0; glVertex -1 -1 -1
+	glTexCoord 0 1; glVertex -1 -1 1
+
+	# Back
+	glNormal 0 0 -1
+	glTexCoord 0 1; glVertex 1 1 -1
+	glTexCoord 0 0; glVertex 1 -1 -1
+	glTexCoord 1 0; glVertex -1 -1 -1
+	glTexCoord 1 1; glVertex -1 1 -1
+
+	glEnd
+	glEndList
+
+	Cube() { glCallList Cube; }
+}
+
+Cube() {
+	Cube_InitGfx
+	glCallList Cube
+}

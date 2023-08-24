@@ -1,0 +1,36 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libnfs
+pkgver=2.0.0
+pkgrel=0
+pkgdesc="client library for accessing NFS shares"
+url="https://github.com/sahlberg/libnfs"
+arch="all"
+license="GPL"
+depends_dev=""
+makedepends="$depends_dev autoconf automake m4 libtool"
+subpackages="$pkgname-dev $pkgname-doc"
+source="https://github.com/sahlberg/libnfs/archive/libnfs-$pkgver.tar.gz"
+
+builddir="$srcdir"/libnfs-libnfs-$pkgver
+
+build() {
+	cd "$builddir"
+	./bootstrap
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var
+	make
+}
+
+package() {
+	cd "$builddir"
+        make DESTDIR="$pkgdir" install
+}
+
+sha512sums="701dd5317b0395523be89123d473f4da5c3ff53c2e30004a922f649f0dbbd97546ee39ab34fce06278a8148c13200ca383726a0822d09846fad6e308f29e42c7  libnfs-2.0.0.tar.gz"

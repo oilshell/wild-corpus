@@ -1,0 +1,66 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Kiyoshi Aman <kiyoshi.aman@gmail.com>
+# Maintainer: Eivind Uggedal <eivind@uggedal.com>
+pkgname=bash-completion
+pkgver=2.5
+pkgrel=0
+pkgdesc="Command-line tab-completion for bash"
+url="https://github.com/scop/bash-completion"
+arch="noarch"
+license="GPL2+"
+depends="bash"
+depends_dev=
+makedepends="$depends_dev"
+install=""
+source="https://github.com/scop/${pkgname}/releases/download/${pkgver}/${pkgname}-${pkgver}.tar.xz"
+
+# Provided with util-linux and networkmanager:
+_conflicting="
+	cal
+	chsh
+	dmesg
+	eject
+	hd
+	hexdump
+	hwclock
+	ionice
+	look
+	ncal
+	newgrp
+	renice
+	rtcwake
+	su
+	nmcli
+	umount
+	mount
+	"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make -j1 DESTDIR="$pkgdir" install || return 1
+
+	mkdir -p "$pkgdir"/usr/share/doc/$pkgname/
+	install -m644 AUTHORS CHANGES CONTRIBUTING.md README.md \
+		"$pkgdir"/usr/share/doc/$pkgname/ || return 1
+
+	cd "$pkgdir"/usr/share/bash-completion/completions
+	for c in $_conflicting; do
+		rm -f $c || return 1
+	done
+}
+
+sha512sums="44ca2cbf38190c2bfa1e98021c1de36dbef0e55f9fe7840e83bd7f91b4c9afc92afa9bb03d53dbc6d9f9b468ac63ff1021a60e456fc239010010d75687eff3da  bash-completion-2.5.tar.xz"

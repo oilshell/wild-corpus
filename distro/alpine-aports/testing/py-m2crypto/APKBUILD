@@ -1,0 +1,48 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-m2crypto
+_pkgname=M2Crypto
+pkgver=0.25.1
+pkgrel=1
+pkgdesc="A crypto and SSL toolkit for Python"
+url="https://pypi.python.org/pypi/M2Crypto/"
+arch="all"
+license="BSD"
+makedepends="python2-dev py-setuptools libressl-dev swig"
+# Note: This library is not compatible with Python 3 yet,
+# see https://gitlab.com/m2crypto/m2crypto/issues/114.
+subpackages="py2-${pkgname#py-}:_py2"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	depends="py2-typing"
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+md5sums="040234289fbef5bed4029f0f7d1dae35  M2Crypto-0.25.1.tar.gz"
+sha256sums="ac303a1881307a51c85ee8b1d87844d9866ee823b4fdbc52f7e79187c2d9acef  M2Crypto-0.25.1.tar.gz"
+sha512sums="096d414efd5558f9ca4cebf46a297fa39f799e35c4325e031ee816689345e041370f2129650a10db66ebfcfe64309a7c7b49082306567baaf003b88ed9d60bda  M2Crypto-0.25.1.tar.gz"

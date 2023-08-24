@@ -1,0 +1,45 @@
+# Contributor: Stuart Cardall <developer@it-offshore.co.uk>
+# Maintainer: Stuart Cardall <developer@it-offshore.co.uk>
+
+pkgname=wireguard-tools
+pkgver=0.0.20171011
+pkgrel=0
+pkgdesc="Next generation secure network tunnel: userspace tools"
+arch='all'
+url='https://www.wireguard.com'
+license="GPLv2"
+makedepends="libmnl-dev"
+subpackages="$pkgname-doc $pkgname-bash-completion:bashcomp:noarch"
+options="!check"
+source="https://git.zx2c4.com/WireGuard/snapshot/WireGuard-$pkgver.tar.xz"
+builddir="$srcdir"/WireGuard-$pkgver
+
+build() {
+	cd "$builddir"
+	make -C src/tools
+}
+
+package() {
+	cd "$builddir"
+	mkdir -p "$pkgdir"/usr/share/doc/$_name
+
+	make -C src/tools \
+		DESTDIR="$pkgdir" \
+		WITH_BASHCOMPLETION=yes \
+		WITH_WGQUICK=yes \
+		WITH_SYSTEMDUNITS=no \
+		install
+
+	find "$builddir"/contrib/examples -name '.gitignore' -delete
+	cp -rf "$builddir"/contrib/examples "$pkgdir"/usr/share/doc/$_name/
+}
+
+bashcomp() {
+	depends="bash"
+	pkgdesc="WireGuard bash completions"
+
+	mkdir -p "$subpkgdir"/usr
+	mv "$pkgdir"/usr/share "$subpkgdir"/usr
+}
+
+sha512sums="7ec5959becf96d214b0b6a0f2c638c986c7b330ce24c323a77f06a2ab853affb85c3cc6ab54d01ece525aef9bfd627bf4b69f21167ee86b16442659d202fcd77  WireGuard-0.0.20171011.tar.xz"

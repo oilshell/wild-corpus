@@ -1,0 +1,38 @@
+# Contributor: Danilo Godec <danilo.godec@agenda.si>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=joe
+pkgver=4.5
+pkgrel=0
+pkgdesc="Full featured terminal-based screen editor"
+url="http://joe-editor.sourceforge.net/"
+arch="all"
+license="GPL"
+depends=""
+makedepends="ncurses-dev"
+subpackages="$pkgname-doc"
+source="http://downloads.sourceforge.net/project/joe-editor/JOE%20sources/$pkgname-$pkgver/$pkgname-$pkgver.tar.gz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	install -Dm644 COPYING "$pkgdir"/usr/share/licenses/$pkgname/COPYING
+}
+
+sha512sums="e07249e7c5d1a33a820788d4647215cb0d0eeac4c2f1f8e9970f7e705a5dcf706510f86e07929adaa6bacac6299e19c32590629f212340878804ef63a78d8509  joe-4.5.tar.gz"

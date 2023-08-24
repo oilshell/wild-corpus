@@ -1,0 +1,103 @@
+# ModelView API
+#--------------------------------------
+#
+# This module sets up the translations and handles user input to give the
+# effect of a camera looking at a model, which you then render at the origin.
+#
+# Functions
+#   ModelViewer_DispatchEvent EVENT [PARAM...]
+#   ModelViewer_Update
+#   ModelViewer_ApplyMatrix
+# Variables
+#   ModelViewer_PanDegPerSec - Number of degrees to rotate per second of continual up/down/left/right keypress
+#   ModelViewer_ZoomPctPerSec - Percentage of distance to model which we will travel in one second
+#   ModelViewer_Distance   - Initial camera distance from the model
+#   ModelViewer_Pitch      - Initial camera vertical angle above the model
+#   ModelViewer_Direction  - Initial camera sideways angle around the model
+#
+
+CmdlineGL_LoadLib Timing
+
+ModelViewer_Zoom=1000
+ModelViewer_Pitch=0
+ModelViewer_Direction=0
+
+ModelViewer_MDrag=0
+ModelViewer_Left=0
+ModelViewer_Right=0
+ModelViewer_Up=0
+ModelViewer_Down=0
+ModelViewer_Grow=0
+ModelViewer_Shrink=0
+ModelViewer_PanDegPerSec=90
+ModelViewer_ZoomPctPerSec=40
+
+# DispatchEvent returns true if it consumed the event, false otherwise.
+# Positonal arguments are as received from CmdlineGL
+ModelViewer_DispatchEvent() {
+	(( $# > 0 )) || return 1
+	local Press
+	case "$1" in
+	K)
+		if [[ "$2" == + ]]; then Press=1; else Press=0; fi
+		case "$3" in
+		right) ((ModelViewer_Right= Press));;
+		left)  ((ModelViewer_Left=  Press));;
+		up)    ((ModelViewer_Up=    Press));;
+		down)  ((ModelViewer_Down=  Press));;
+		=)     ((ModelViewer_Grow=  Press));;
+		-)     ((ModelViewer_Shrink=Press));;
+		*)     return 1;; # not consumed
+		esac
+		return 0 # consumed
+		;;
+	M)
+		case "$2" in
+		@)
+			local dx="$5" dy="$6";
+			# Handle mouse drag actions.
+			# If the mouse has moved since last time change the pitch or direction
+			# by the vertical or horizontal distance the mouse has moved.
+			if ((ModelViewer_MDrag)); then
+				((ModelViewer_Pitch+= dy*1000))
+				((ModelViewer_Direction+= dx*1000));
+				return 0 # consumed
+			fi
+			;;
+		+)
+			if [[ "$3" == 1 ]]; then
+				ModelViewer_MDrag=1
+				return 0 # consumed
+			fi;;
+		-)
+			if [[ "$3" == 1 ]]; then
+				ModelViewer_MDrag=0
+				return 0 # consumed
+			fi;;
+		esac
+		return 1 # not consumed
+		;;
+	esac
+}
+
+# The user input events toggle variables, but don't modify the viewer state, yet.
+# Call Update once per frame to apply those inputs to the viewer state.
+ModelViewer_Update() {
+	# All numbers are scaled by 1000 to match time reported in milliseconds
+	((ModelViewer_Left))  && ((ModelViewer_Direction+=Timing_dT*ModelViewer_PanDegPerSec))
+	((ModelViewer_Right)) && ((ModelViewer_Direction-=Timing_dT*ModelViewer_PanDegPerSec))
+	((ModelViewer_Up))    && ((ModelViewer_Pitch-=Timing_dT*ModelViewer_PanDegPerSec))
+	((ModelViewer_Down))  && ((ModelViewer_Pitch+=Timing_dT*ModelViewer_PanDegPerSec))
+	local adjust;
+	((adjust=ModelViewer_Grow? ( ModelViewer_Shrink? 0 : -1 ) : ModelViewer_Shrink? 1 : 0))
+	((adjust= adjust + adjust * ModelViewer_ZoomPctPerSec*ModelViewer_Zoom*Timing_dT/100000))
+	((ModelViewer_Zoom += adjust))
+	((ModelViewer_Zoom>=10)) || ((ModelViewer_Zoom=10))
+}
+
+# Call this right after LoadIdentity to move from camera space to model space
+ModelViewer_ApplyMatrix() {
+	glScale 1000/$ModelViewer_Zoom
+	glRotate $ModelViewer_Pitch/1000 1/1 0 0
+	glRotate $ModelViewer_Direction/1000 0 1/1 0
+}

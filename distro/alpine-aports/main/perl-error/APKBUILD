@@ -1,0 +1,40 @@
+# Maintainer:  Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=perl-error
+_realname=Error
+pkgver=0.17025
+pkgrel=0
+pkgdesc="Perl module error/exception handling in an OO-ish way"
+url="http://search.cpan.org/dist/Error/"
+arch="noarch"
+license="GPL PerlArtistic"
+depends="perl"
+makedepends="perl-dev"
+install=
+subpackages="$pkgname-doc"
+source="http://search.cpan.org/CPAN/authors/id/S/SH/SHLOMIF/$_realname-$pkgver.tar.gz"
+builddir="$srcdir"/$_realname-$pkgver
+
+prepare() {
+	cd "$builddir"
+        export CFLAGS=`perl -MConfig -E 'say $Config{ccflags}'`
+	PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor
+}
+
+build() {
+	cd "$builddir"
+        export CFLAGS=`perl -MConfig -E 'say $Config{ccflags}'`
+	make
+}
+
+check() {
+	cd "$builddir"
+	make test
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+        find "$pkgdir" \( -name perllocal.pod -o -name .packlist \) -delete
+}
+
+sha512sums="0cb77d8be2f759aaf8970f9d5fa5483ba5ba687c115f6bbeaa22afb1b5c50fe6f70b4dce19a3c8d1bf6e9bfad0af86f2e03faac493f428b04962e5337be3ae2b  Error-0.17025.tar.gz"

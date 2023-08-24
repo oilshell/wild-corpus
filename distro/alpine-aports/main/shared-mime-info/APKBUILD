@@ -1,0 +1,37 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=shared-mime-info
+pkgver=1.8
+pkgrel=1
+pkgdesc="Freedesktop.org Shared MIME Info"
+url="http://freedesktop.org/Software/shared-mime-info"
+arch="all"
+license="GPL"
+#options="!check"  # No test suite.
+makedepends="libxml2-dev libxml2-utils glib-dev intltool"
+depends=
+install="$pkgname.post-deinstall"
+triggers="$pkgname.trigger=/usr/share/mime"
+subpackages="$pkgname-doc $pkgname-lang"
+source="http://freedesktop.org/~hadess/$pkgname-$pkgver.tar.xz"
+
+build() {
+	cd "$builddir"
+	ac_cv_func_fdatasync=no ./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--enable-default-make-check \
+		--disable-update-mimedb
+	make -j1
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make -j1 DESTDIR="$pkgdir" install
+}
+sha512sums="e3fd57898ca85033a29f17d075b9a18a6ebee14db5f996183fd1183a6c6382c3d10c74cd1863563cd031359937ab95c886909ba6f9d7ecc8f2056464673b5fff  shared-mime-info-1.8.tar.xz"

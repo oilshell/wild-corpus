@@ -1,0 +1,59 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer:
+pkgname=bspwm
+pkgver=0.9.3
+pkgrel=0
+pkgdesc="Tiling window manager based on binary space partitioning"
+url="https://github.com/baskerville/bspwm"
+arch="all"
+license="BSD"
+makedepends="libxcb-dev xcb-util-dev xcb-util-wm-dev xcb-util-keysyms-dev"
+subpackages="
+	$pkgname-doc
+	$pkgname-zsh-completion:zshcomp:noarch
+	$pkgname-bash-completion:bashcomp:noarch
+	$pkgname-fish-completions:fishcomp:noarch"
+source="$pkgname-$pkgver.tar.gz::https://github.com/baskerville/$pkgname/archive/$pkgver.tar.gz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	make PREFIX=/usr -C "$builddir"
+}
+
+package() {
+	make DESTDIR="$pkgdir" PREFIX=/usr \
+		-C "$builddir" install
+}
+
+zshcomp() {
+	depends=""
+	pkgdesc="Zsh completions for $pkgname"
+	install_if="$pkgname=$pkgver-r$pkgrel zsh"
+
+	mkdir -p "$subpkgdir"/usr/share/zsh/site-functions
+	mv "$pkgdir"/usr/share/zsh/site-functions/* \
+		"$subpkgdir"/usr/share/zsh/site-functions
+
+}
+
+bashcomp() {
+	depends=""
+	pkgdesc="Bash completions for $pkgname"
+	install_if="$pkgname=$pkgver-r$pkgrel bash-completion"
+
+	mkdir -p "$subpkgdir"/usr/share/bash-completion/completions/
+	mv "$pkgdir"/usr/share/bash-completion/completions/* \
+		"$subpkgdir"/usr/share/bash-completion/completions/
+}
+
+fishcomp() {
+	pkgdesc="Fish completions for $pkgname"
+	depends=""
+	install_if="$pkgname=$pkgver-r$pkgrel fish"
+
+	mkdir -p "$subpkgdir"/usr/share/fish/completions/
+	mv "$pkgdir"/usr/share/fish/vendor_completions.d/*.fish \
+		"$subpkgdir"/usr/share/fish/completions/
+}
+
+sha512sums="015ed79af4b31c5fbd10bdf3d6945e3e2575ef3d1ab48dc7ddeb52e99cd6e121991a320515ad05b42b001b524c7ebe38b5d2b2aae0078c6601a36653718ab508  bspwm-0.9.3.tar.gz"

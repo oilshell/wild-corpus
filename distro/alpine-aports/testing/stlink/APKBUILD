@@ -1,0 +1,40 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Sören Tempel <soeren+alpine@soeren-tempel.net>
+pkgname=stlink
+pkgver=1.4.0
+pkgrel=0
+pkgdesc="STM32 discovery line linux programmer"
+url="https://github.com/texane/stlink"
+arch="all"
+license="MIT"
+depends=""
+depends_dev=""
+makedepends="cmake libusb-dev"
+install=""
+subpackages="$pkgname-doc $pkgname-dev"
+source="$pkgname-$pkgver.tar.gz::https://github.com/texane/$pkgname/archive/$pkgver.tar.gz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	cd "$builddir"
+	cmake \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DBUILD_SHARED_LIBS=True \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+		-DCMAKE_C_FLAGS="$CFLAGS -Wno-error=cpp" \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+
+	mkdir -p "$pkgdir"/usr/share/doc/$pkgname
+	install -m644 README.md ChangeLog.md doc/tutorial.md \
+		"$pkgdir"/usr/share/doc/$pkgname/ || return 1
+}
+
+sha512sums="cb7617068a6dcaf7e8d0ccfb8b918f0373f6120398dab40a8b8d6567705871226684fd19aad92e4bab623310a5da13ea9fd70153b619f58d3534f0a4ff3a9886  stlink-1.4.0.tar.gz"

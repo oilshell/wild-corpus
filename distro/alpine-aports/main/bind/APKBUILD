@@ -1,0 +1,147 @@
+# Contributor: Sergei Lukin <sergej.lukin@gmail.com>
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=bind
+pkgver=9.11.1_p2
+_ver=${pkgver%_p*}
+_p=${pkgver#*_p}
+[ "$_p" != "$pkgver" ] && _ver="${_ver}-P$_p"
+pkgrel=2
+pkgdesc="The ISC DNS server"
+url="http://www.isc.org"
+arch="all"
+license="MIT BSD"
+depends=""
+pkgusers="named"
+pkggroups="named"
+makedepends="bash libressl-dev libcap-dev perl linux-headers bsd-compat-headers libxml2-dev"
+install="$pkgname.pre-install"
+subpackages="$pkgname-doc $pkgname-dev $pkgname-libs $pkgname-tools"
+source="http://ftp.isc.org/isc/bind9/${_ver}/bind-${_ver}.tar.gz
+	bind.so_bsdcompat.patch
+	named.initd
+	named.confd
+	named.conf.authoritative
+	named.conf.recursive
+	127.zone
+	localhost.zone
+	named.ca
+	"
+
+# secfixes:
+#   9.11.0_p5-r0:
+#     - CVE-2017-3136
+#     - CVE-2017-3137
+#     - CVE-2017-3138
+#   9.10.4_p5-r0:
+#     - CVE-2016-9131
+#     - CVE-2016-9147
+#     - CVE-2016-9444
+
+builddir="$srcdir/bind-${_ver}"
+prepare() {
+	cd "$builddir"
+
+	### http://bugs.gentoo.org/show_bug.cgi?id=227333
+	export CFLAGS="$CFLAGS -D_GNU_SOURCE"
+
+	# Adjusting PATHs in manpages
+	for i in bin/named/named.8 bin/check/named-checkconf.8 bin/rndc/rndc.8; do
+		sed -i \
+			-e 's:/etc/named.conf:/etc/bind/named.conf:g' \
+			-e 's:/etc/rndc.conf:/etc/bind/rndc.conf:g' \
+			-e 's:/etc/rndc.key:/etc/bind/rndc.key:g' \
+			"${i}" || return 1
+	done
+
+	patch -p0 -i "$srcdir"/bind.so_bsdcompat.patch || return 1
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc/bind \
+		--localstatedir=/var \
+		--with-openssl=/usr \
+		--enable-linux-caps \
+		--with-libxml2 \
+		--enable-threads \
+		--enable-filter-aaaa \
+		--enable-ipv6 \
+		--enable-shared \
+		--enable-static \
+		--with-libtool \
+		--with-randomdev=/dev/random \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		|| return 1
+
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	install -d -m0770 -g named -o root "$pkgdir"/var/bind \
+		"$pkgdir"/var/bind/sec \
+		"$pkgdir"/var/bind/dyn \
+		"$pkgdir"/var/run/named \
+		|| return 1
+
+	install -d -m0750 -g named -o root "$pkgdir"/etc/bind \
+		"$pkgdir"/var/bind/pri || return 1
+
+	make -j1 DESTDIR="$pkgdir" install || return 1
+
+	# FIXME: Workaround for broken symlink handling in abuild
+	rm -f "$pkgdir"/usr/share/man/man1/bind9-config.1
+	find "$pkgdir"/usr/share/man/man3 -name 'lwres_*' \
+		-type f -exec rm -f \{\} \;
+
+	install -Dm755 "$srcdir"/named.initd \
+		"$pkgdir"/etc/init.d/named || return 1
+	install -Dm644 "$srcdir"/named.confd \
+		"$pkgdir"/etc/conf.d/named || return 1
+	install -Dm644 "$srcdir"/named.conf.authoritative \
+		"$pkgdir"/etc/bind/named.conf.authoritative || return 1
+	install -Dm644 "$srcdir"/named.conf.recursive \
+		"$pkgdir"/etc/bind/named.conf.recursive || return 1
+	install -Dm644 "$srcdir"/named.ca \
+		"$pkgdir"/var/bind/named.ca || return 1
+	install -Dm644 "$srcdir"/127.zone \
+		"$pkgdir"/var/bind/pri/127.zone || return 1
+	install -Dm644 "$srcdir"/localhost.zone \
+		"$pkgdir"/var/bind/pri/localhost.zone || return 1
+
+	cd "$pkgdir"/var/bind
+	ln -s named.ca root.cache || return 1
+}
+
+tools() {
+	pkgdesc="The ISC DNS tools"
+	install=""
+	depends=""
+
+	mkdir -p "$subpkgdir"/usr/bin
+	for i in dig host nslookup delv nsupdate; do
+		mv "$pkgdir"/usr/bin/${i} "$subpkgdir"/usr/bin/ || return 1
+	done
+
+	mkdir -p "$subpkgdir"/usr/sbin
+	for i in "$pkgdir"/usr/sbin/dnssec-*; do
+		mv "$i" "$subpkgdir"/usr/sbin || return 1
+	done
+}
+
+sha512sums="275e63d87372a7cd994a5116a750fd1fffc3d29d0104e98a85316a181d9a251a5cb3e009a55b73685a17a68e2f4516db005c667f6e75309f88e2d30096507769  bind-9.11.1-P2.tar.gz
+f3e3d1b680617485b9db20a59a10fec3b3b539d423984493228a7d5aaa29d699b9012ad60e863e56bdaf15b73952c22710d0ded1c86cd24417ac775ee062cfa3  bind.so_bsdcompat.patch
+196c0a3b43cf89e8e3547d7fb63a93ff9a3306505658dfd9aa78e6861be6b226580b424dd3dd44b955b2d9f682b1dc62c457f3ac29ce86200ef070140608c015  named.initd
+127bdcc0b5079961f0951344bc3fad547450c81aee2149eac8c41a8c0c973ea0ffe3f956684c6fcb735a29c43d2ff48c153b6a71a0f15757819a72c492488ddf  named.confd
+d2f61d02d7829af51faf14fbe2bafe8bc90087e6b6697c6275a269ebbddcaa14a234fff5c41da793e945e8ff1de3de0858a40334e0d24289eab98df4bb721ac5  named.conf.authoritative
+3aba9763cfaf0880a89fd01202f41406b465547296ce91373eb999ea7719040bc1ac4e47b0de025a8060f693d3d88774a20d09a43fa7ac6aa43989b58b5ee8fe  named.conf.recursive
+eed9886717539399518e011ae5eae6335aed4fae019e1def088c5be26bdc896c99c07adf84ee61babafa31d31ff3b028263d1c88d2eee17ecf4c95a9d77d524c  127.zone
+340e86472a2c2746fe585c0aa5f079d3a9b46e828c1f53d48026533a169b7f77ded7d0a13d291d6962607bb9481456e6fa69df1834603e7555332615fb998f0b  localhost.zone
+badb85a67199b1ff28cdd3529c6d7c70b2757a71f52fd5e0aecb6dab80fa1838af863cd5d451be078cad3ef35f0c256aaac1831671cec119c5a689503e98a192  named.ca"

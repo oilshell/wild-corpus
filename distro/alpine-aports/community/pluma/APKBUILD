@@ -1,0 +1,41 @@
+# Contributor: Alan Lacerda <alacerda@alpinelinux.org>
+# Maintainer: Alan Lacerda <alacerda@alpinelinux.org>
+pkgname=pluma
+pkgver=1.19.1
+pkgrel=1
+pkgdesc="A small and lightweight UTF-8 text editor for the MATE"
+url="https://github.com/mate-desktop/pluma"
+arch="all"
+license="GPLv2"
+# check fails as tracked in https://github.com/mate-desktop/pluma/issues/33
+options="!check"
+makedepends="intltool enchant-dev iso-codes-dev gtk+3.0-dev
+	mate-desktop-dev gtksourceview-dev dconf-dev libsm-dev itstool
+	libxml2-utils fortify-headers libpeas-dev gsettings-desktop-schemas-dev"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+source="http://pub.mate-desktop.org/releases/${pkgver%.*}/$pkgname-$pkgver.tar.xz
+	0001-fix-accessperms-in-tests.patch"
+
+builddir="$srcdir/$pkgname-$pkgver"
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--sysconfdir=/etc \
+		--prefix=/usr
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="27851010a751ecb5383df22accb6131859c054ff3bf5afd802312194700f8b550053996a79a36a852492371de4002f9370b259c04fd025389d699c6048943eb8  pluma-1.19.1.tar.xz
+3aa0ae2e383bcc36c63384455062954876e77995da79a757b4eb6e37f3b2e5f7139165d7bb95c193ff888d33d2682773e981bf7e44fd963e918696d64e537741  0001-fix-accessperms-in-tests.patch"

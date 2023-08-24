@@ -1,0 +1,55 @@
+# Contributor: Stuart Cardall <developer@it-offshore.co.uk>
+# Maintainer: Stuart Cardall <developer@it-offshore.co.uk>
+pkgname=xpra
+pkgver=2.1.2
+pkgrel=0
+pkgdesc="Xpra is 'screen for X' & allows you to run X programs, usually on a remote host over SSH or encrypted tcp"
+url="http://xpra.org"
+arch="all !s390x"
+license="GPLv2+"
+depends="py-gobject py-gtk py-imaging xf86-video-dummy xvfb setxkbmap xorg-server
+	py2-numpy py2-pillow py-gtkglext py2-lz4 py-rencode py-opencl py2-xxhash
+	py2-cryptography"
+makedepends="python2-dev cython-dev libx11-dev libxtst-dev libxcomposite-dev libxdamage-dev
+	libxrandr-dev py-gobject-dev py-gtk-dev libxkbfile-dev gtk+2.0-dev x264-dev x265-dev
+	libvpx-dev ffmpeg-dev cython linux-headers gstreamer-dev py2-yuicompressor"
+subpackages="$pkgname-doc $pkgname-tests::noarch $pkgname-webclient::noarch"
+options="!check"
+source="https://xpra.org/src/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	# https://www.xpra.org/trac/ticket/1080
+	CFLAGS="$CFLAGS -fno-strict-aliasing"
+	python2 setup.py build \
+		--with-bundle_tests
+}
+
+package() {
+	cd "$builddir"
+
+	python2 setup.py install --prefix=/usr --root="$pkgdir"
+	# fixes Error relocating /usr/lib/xorg/modules/drivers/dummy_drv.so: fbPictureInit: symbol not found
+	printf '\nSection "Module"\n  Load\t"fb"\nEndSection' >> $pkgdir/etc/xpra/xorg.conf
+	# https://bugs.alpinelinux.org/issues/5478
+}
+
+tests() {
+	pkgdesc="Xpra test suite"
+
+	cd "$builddir"
+	mkdir -p "$subpkgdir"/usr/share/xpra
+	cp -rf tests "$subpkgdir"/usr/share/xpra/
+}
+
+webclient() {
+	pkgdesc="Xpra websockets client"
+
+	cd "$pkgdir"
+	mkdir -p "$subpkgdir"/usr/share/xpra
+	cp -rf usr/share/xpra/www "$subpkgdir"/usr/share/xpra/
+}
+
+sha512sums="54a61ff25e19739453b5c30d7861f43c635b23677111549c38428141112be48445c267a56778159b51701c1bad15fd9ea26605807fe7cb67c9057adeb480a08a  xpra-2.1.2.tar.xz"

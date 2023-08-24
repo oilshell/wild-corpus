@@ -1,0 +1,37 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=libewf
+pkgver=20160424
+pkgrel=1
+pkgdesc="Library to support the Expert Witness Compression Format"
+url="http://libewf.sourceforge.net"
+arch="all"
+license="LGPL2+"
+depends=""
+depends_dev="zlib-dev bzip2-dev libressl-dev util-linux-dev"
+makedepends="$depends_dev"
+install=""
+subpackages="$pkgname-dev $pkgname-doc"
+source="https://github.com/libyal/libewf/releases/download/$pkgver/$pkgname-experimental-$pkgver.tar.gz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	cd "$builddir"
+	# fix build on gcc6
+	export CFLAGS="$CFLAGS -std=gnu89"
+	./configure \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--disable-nls \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+md5sums="c1ee48220266c5870f538008da1bb524  libewf-experimental-20160424.tar.gz"
+sha256sums="613467112f52fe960ce0121dd1ade8eb7887d3fcfc761aa728d2f1aa9f135116  libewf-experimental-20160424.tar.gz"
+sha512sums="610a3ad47e638787de8fcc0a613e00a0492c14bdf169b0739497c6b9de168937065d38928cbb393aeedb3cbaf4ceed1854712ddc32f46a2b9122a56a46518254  libewf-experimental-20160424.tar.gz"

@@ -1,0 +1,45 @@
+# Contributor: Mari Hahn <mari.hahn@wwu.de>
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=tint2
+pkgver=15.0
+_gitver="ea92bf771828b78b9dce53b8f1cbc68fe5324cbc"
+pkgrel=0
+pkgdesc="tint2 is a simple unintrusive panel/taskbar"
+url="https://gitlab.com/o9000/tint2"
+arch="all"
+license="GPL2"
+options="!check"
+depends="imlib2 glib pango cairo libxcomposite libxdamage
+	libxinerama libxrandr gtk+"
+makedepends="cmake imlib2-dev glib-dev pango-dev cairo-dev
+    libxcomposite-dev libxdamage-dev libxinerama-dev libxrandr-dev
+    gtk+-dev librsvg-dev startup-notification-dev linux-headers"
+subpackages="$pkgname-doc $pkgname-lang"
+source="http://dev.alpinelinux.org/archive/${pkgname}/${pkgname}-${pkgver}.tar.bz2"
+builddir="$srcdir"/$pkgname-${pkgver}-$_gitver
+
+prepare() {
+	cd "$builddir"
+	mkdir -p build || return 1
+}
+
+build() {
+	cd "$builddir"/build
+	cmake \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DBUILD_SHARED_LIBS=True \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+		-DCMAKE_C_FLAGS="$CFLAGS" \
+		..
+	make
+}
+
+package() {
+	cd "$builddir"/build
+	make DESTDIR="${pkgdir}" install || return 1
+}
+
+sha512sums="4c64efd8a8cd68c3a6dde9af69aef6ea19aa72d08f4b53c3cdb359926658c325ffbde312f47277cada955ed46808a5a074ac9e549e9982bfcacaba2d00bd6146  tint2-15.0.tar.bz2"

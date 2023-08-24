@@ -1,0 +1,144 @@
+# Contributor: <kalonji@gmail.com>
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=zsh
+pkgver=5.4.1
+pkgrel=0
+pkgdesc="A very advanced and programmable command interpreter (shell)"
+url="http://www.zsh.org/"
+arch="all"
+license="BSD"
+makedepends="ncurses-dev"
+install="zsh.post-install zsh.post-upgrade zsh.pre-deinstall"
+source="http://www.zsh.org/pub/$pkgname-$pkgver.tar.xz
+	zprofile
+	"
+subpackages="$pkgname-doc $pkgname-calendar::noarch $pkgname-vcs::noarch $pkgname-zftp"
+builddir="$srcdir/$pkgname-$pkgver"
+
+_libdir="usr/lib/zsh/$pkgver"
+_sharedir="usr/share/zsh/$pkgver"
+
+# Move some bigger completion files to subpackages.
+_comps="android-tools:Unix/_adb
+	bzr:Unix/_bzr
+	cvs:Unix/_cvs
+	gcc:Unix/_gcc
+	git:Unix/_git
+	graphicsmagick:Unix/_graphicsmagick
+	imagemagick:Unix/_imagemagick
+	lynx:Unix/_lynx
+	mercurial:Unix/_hg
+	rsync:Unix/_rsync
+	subversion:Unix/_subversion
+	tmux:Unix/_tmux
+	zfs:Unix/_zfs*:Unix/_zpool"
+for _i in $_comps; do
+	subpackages="$subpackages ${_i%%:*}-zsh-completion:_completion:noarch"
+done
+
+prepare() {
+	cd "$builddir"
+
+	default_prepare
+	update_config_sub
+
+	# Remove completions for other systems.
+	cd Completion
+	rm -Rf AIX BSD Cygwin Darwin Debian Mandriva Redhat Solaris openSUSE
+
+	# Remove completions for programs that are not available on Alpine
+	# (just to decrease size of the package).
+	cd Unix/Command
+	rm -f _aap _apm _baz _bittorrent _bpython _ccal _cdcd _chkconfig _clay \
+		_cowsay _cplay _cssh _darcs _devtodo _dict _dsh _elfdump _elm \
+		_enscript _finger _flasher _fsh _gnupod _guilt _initctl _lzop \
+		_mencal _module _monotone _moosic _mysqldiff _nkf \
+		_pack _pax _perforce _pine _pkgadd _pkginfo _pkgrm _prcs \
+		_quilt _raggle _rcs _rlogin _rubber _sablotron _sisu _socket \
+		_stgit _surfraw _tardy _telnet _tin _tla _topgit _totd _twidge \
+		_unace _unison _units _uzbl _vcsh _vux _wiggle _xmms2 _yodl
+	cd ../../Linux/Command
+	rm -f _acpitool _mondo _tpb _tpconfig _uml _vserver
+	cd ../../X/Command
+	rm -f _acroread _dcop _gnome-gv _gqview _gv _kfmclient _matlab \
+		_nautilus _netscape _okular _qiv _vnc _xfig _xloadimage \
+		_xournal _xv _xwit
+}
+
+build() {
+	cd "$builddir"
+
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--bindir=/bin \
+		--enable-etcdir=/etc/zsh \
+		--enable-multibyte \
+		--enable-function-subdirs \
+		--enable-zsh-secure-free \
+		--sysconfdir=/etc \
+		--with-tcsetpgrp \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info
+	make
+}
+
+package() {
+	cd "$builddir"
+
+	make DESTDIR="$pkgdir" install
+	install -Dm644 "$srcdir"/zprofile "$pkgdir"/etc/zsh/zprofile
+}
+
+doc() {
+	default_doc
+	_submv $_sharedir/help
+}
+
+calendar() {
+	pkgdesc="Calendar Function System for ZSH"
+	depends="$pkgname"
+
+	_submv $_sharedir/functions/Calendar
+}
+
+vcs() {
+	pkgdesc="Version Control Information module for ZSH (vcs_info)"
+	depends="$pkgname"
+
+	_submv $_sharedir/functions/VCS_Info
+}
+
+zftp() {
+	pkgdesc="Zftp Function System for ZSH"
+	depends="$pkgname"
+
+	_submv $_libdir/zsh/zftp.so
+	_submv $_sharedir/functions/Zftp
+}
+
+_completion() {
+	local name="${subpkgname%-zsh-completion}"
+	pkgdesc="Zsh completions for $name"
+	depends="$pkgname"
+	install_if="$pkgname=$pkgver-r$pkgrel $name"
+
+	local files="$(printf '%s\n' $_comps \
+		| sed -En "s|^$name:(.*)|\1|p" | tr : ' ')"
+	test -n "$files" || { echo "$name not found in \$_comps" >&2; return 1; }
+
+	local f; for f in $files; do
+		_submv $_sharedir/functions/Completion/$f
+	done
+}
+
+_submv() {
+	local path="$1"
+	mkdir -p "$subpkgdir"/${path%/*}
+	mv "$pkgdir"/$path "$subpkgdir"/${path%/*}/
+}
+
+sha512sums="c666c54b05e2707e3a3cf9a87a17863792f0c89ec14f5fdc85a3064f26249cfba42a2953bc76bb90205fb87a08c203a165a5240c9fd6c489c13d8cc82ee6e979  zsh-5.4.1.tar.xz
+59182b99447872ded8adf0d890e9359ee47fce0b7acb2808f4308f945885fbf6d977a0917bbb5c0f21454caf3ba06ab092127732da4f84292d6ab0989a0110fe  zprofile"

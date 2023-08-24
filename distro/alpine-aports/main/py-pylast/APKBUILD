@@ -1,0 +1,44 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer:
+pkgname=py-pylast
+pkgver=1.9.0
+pkgrel=0
+pkgdesc="A Python interface to the last.fm API"
+url="https://github.com/pylast/pylast"
+arch="noarch"
+license="Apache"
+makedepends="python2-dev py-setuptools python3-dev"
+subpackages="py3-${pkgname#py-}:_py3 py2-${pkgname#py-}:_py2"
+source="https://files.pythonhosted.org/packages/source/p/pylast/pylast-$pkgver.tar.gz"
+builddir="$srcdir"/pylast-$pkgver
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+sha512sums="ff3929583d88466738c9a1e964676652717c9f5bd4631f1a0a7855903e77cd394a612b0e2e8fc2f698ac84a34a135f4e940ff7760c2c88bf388ae56fc9c3da65  pylast-1.9.0.tar.gz"

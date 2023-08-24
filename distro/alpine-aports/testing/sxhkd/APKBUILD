@@ -1,0 +1,26 @@
+# Contributor: Olivier Mauras <olivier@mauras.ch>
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer:
+pkgname=sxhkd
+pkgver=0.5.8
+pkgrel=0
+pkgdesc="Simple X hotkey daemon"
+url="https://github.com/baskerville/sxhkd"
+arch="all"
+license="BSD"
+makedepends="xcb-util-keysyms-dev libxcb-dev"
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/baskerville/sxhkd/archive/$pkgver.tar.gz"
+builddir=$srcdir/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	make PREFIX=/usr
+}
+
+package() {
+	cd "$builddir"
+	make PREFIX=/usr DESTDIR="$pkgdir" install
+}
+
+sha512sums="59b38a77e7fd4b23cb109a1365514f39d23ae5bd1b467355ad894d3a861627fd0fc5c5fb556176161c6580c719a4032cf516f60eb3023dc30bf09ae362e4e094  sxhkd-0.5.8.tar.gz"

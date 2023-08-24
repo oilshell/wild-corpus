@@ -1,0 +1,45 @@
+# Contributor: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-country
+_pkgname=pycountry
+pkgver=17.9.23
+pkgrel=0
+pkgdesc="ISO country, subdivision, language, currency and script definitions and their translations"
+url="https://pypi.python.org/pypi/pycountry"
+arch="noarch"
+license="LGPL2+"
+makedepends="python2-dev py-setuptools python3-dev"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+sha512sums="168e2d2693629a39a85a4c6aa7187323693ca73d6af0cc947d3536ae373eca602e7e3add91ba114966db4ebf52118ef3d6a3dbf8339734ec68682bab559beeb5  pycountry-17.9.23.tar.gz"

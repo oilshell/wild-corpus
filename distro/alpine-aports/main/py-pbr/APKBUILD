@@ -1,0 +1,52 @@
+# Contributor: Francesco Colista <fcolista@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=py-pbr
+_pkgname=pbr
+pkgver=3.1.1
+pkgrel=0
+pkgdesc="Python Build Reasonableness"
+url="https://pypi.python.org/pypi/pbr"
+arch="noarch"
+license="ASL 2.0"
+depends=""
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+check() {
+	cd "$builddir"
+	python2 setup.py check
+	python3 setup.py check
+}
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+	python3 setup.py build
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+sha512sums="c01fb83678f8fc3acddc153dd341a17ed9d602b6770f0ff244b1c5b54c37d4ddcbd0c3d726f7d7020865819e02797c1c79a0c15e9ee2ae5c1510fce7112b2a3a  pbr-3.1.1.tar.gz"

@@ -1,0 +1,28 @@
+# Contributor: Stuart Cardall <developer@it-offshore.co.uk>
+# Maintainer: Stuart Cardall <developer@it-offshore.co.uk>
+pkgname=cython
+pkgver=0.25.2
+pkgrel=0
+pkgdesc="Cython is an optimising static compiler for both the Python & the extended Cython programming languages."
+url="http://cython.org"
+arch="all"
+license="ASL-2.0"
+depends=""
+depends_dev="python2-dev py-pgen cython"
+makedepends="$depends_dev"
+subpackages="$pkgname-dev"
+source="$pkgname-$pkgver.tar.gz::https://github.com/cython/cython/archive/$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+}
+
+package() {
+	cd "$builddir"
+	python2 setup.py install --prefix=/usr \
+		--root="$pkgdir" --optimize=1
+}
+
+sha512sums="65c15dd5f8af1ecc5943f557d38a122b69a4d02b41f63dfa68d7201f97eb2b4ff9684eb6cc0dd629fe8e3c9acdbeac1be9835e92fab0ba9e54768731a794d866  cython-0.25.2.tar.gz"

@@ -1,0 +1,37 @@
+# Contributor: Alan Lacerda <alacerda@alpinelinux.org>
+# Maintainer: Alan Lacerda <alacerda@alpinelinux.org>
+pkgname=mate-session-manager
+pkgver=1.19.0
+pkgrel=0
+pkgdesc="The MATE session manager"
+url="https://github.com/mate-desktop/mate-session-manager"
+arch="all"
+license="GPL2"
+depends="mate-common mate-desktop"
+makedepends="intltool libtool dconf-dev dbus-glib-dev gtk+3.0-dev
+	libsm-dev mate-desktop-dev"
+subpackages="$pkgname-doc $pkgname-lang"
+source="http://pub.mate-desktop.org/releases/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--sysconfdir=/etc \
+		--prefix=/usr
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="eff55c333e48dac72feb692832a031d8b46b653cb90f849549a50a65caf00c07167481e8b10e5a08e9250a8ec92ef01aeda2d8df82e1b3ec6dd06cfa566a1db2  mate-session-manager-1.19.0.tar.xz"

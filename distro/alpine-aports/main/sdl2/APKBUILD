@@ -1,0 +1,41 @@
+# Contributor: August Klein <amatcoder@gmail.com>
+# Maintainer: August Klein <amatcoder@gmail.com>
+pkgname=sdl2
+pkgver=2.0.6
+pkgrel=1
+_pkgname=SDL2
+pkgdesc="A development library designed to provide low level access to audio, keyboard, mouse, joystick and graphics"
+url="http://www.libsdl.org"
+arch="all"
+license="zlib"
+depends=""
+depends_dev="alsa-lib-dev libxcursor-dev libxrandr-dev libxrender-dev mesa-dev directfb-dev"
+makedepends="$depends_dev"
+subpackages="$pkgname-dev"
+source="https://www.libsdl.org/release/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--enable-alsa \
+		--enable-clock_gettime \
+		--disable-arts \
+		--disable-esd \
+		--disable-nas \
+		--disable-rpath \
+		--with-x \
+		--enable-video-directfb \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+sha512sums="ad4dad5663834ee0ffbdca1b531d753449b260c9256df2c48da7261aacd9795d91eef1286525cf914f6b92ba5985de7798f041557574b5d978b8224f10041830  SDL2-2.0.6.tar.gz"

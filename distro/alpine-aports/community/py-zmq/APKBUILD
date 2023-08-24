@@ -1,0 +1,49 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-zmq
+_pkgname=pyzmq
+pkgver=16.0.2
+pkgrel=1
+pkgdesc="Python bindings for ZeroMQ"
+url="http://pypi.python.org/pypi/pyzmq"
+arch="all"
+license="LGPL3+ BSD"
+depends=""
+makedepends="python2-dev python3-dev py-setuptools zeromq-dev"
+install=""
+subpackages="py3-${pkgname/py-/}:_py3 py2-${pkgname/py-/}:_py2"
+source="https://files.pythonhosted.org/packages/source/p/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py() {
+	local python=$1
+	pkgdesc="$pkgdesc - $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+
+md5sums="9a8768b00a566a400d70318f8c359cfe  pyzmq-16.0.2.tar.gz"
+sha256sums="0322543fff5ab6f87d11a8a099c4c07dd8a1719040084b6ce9162bcdf5c45c9d  pyzmq-16.0.2.tar.gz"
+sha512sums="40eaf8ce39db86ab3866890d74b92bd6f20d4ae827828a8772003656d899d10ffcfc222d21f344d9daba390824e6c43b9f34e31beb604ec5ee1ec199165f4b96  pyzmq-16.0.2.tar.gz"

@@ -1,0 +1,32 @@
+# Contributor: ScrumpyJack <scrumpyjack@st.ilet.to>
+# Maintainer: ScrumpyJack <scrumpyjack@st.ilet.to>
+pkgname=nmh
+pkgver=1.6
+pkgrel=3
+pkgdesc="nmh is a powerful electronic mail handling system"
+url="http://www.nongnu.org/nmh/"
+arch="all"
+license="BSD"
+makedepends="libressl-dev ncurses-dev gnutls-dev readline-dev gdbm-dev"
+subpackages="$pkgname-doc"
+source="http://download.savannah.nongnu.org/releases/${pkgname}/${pkgname}-${pkgver}.tar.gz"
+
+builddir=${srcdir}/${pkgname}-${pkgver}
+build() {
+	cd "$builddir"
+        ./configure \
+           --host=$CHOST \
+           --build=$CBUILD \
+           --prefix=/usr \
+           --with-readline \
+           --with-tls \
+           --sysconfdir=/etc/nmh
+        make
+}
+
+package() {
+	cd "$builddir"
+        make DESTDIR="$pkgdir" install
+}
+
+sha512sums="03775e73f69eb21088e191f41a0bbc2e631956f0d496f87be97981ac2c85d8cbe0680e8ee7e37f97e79c34ccd814fca78f2684acfc8390e333a46c710fbdb2b7  nmh-1.6.tar.gz"

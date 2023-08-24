@@ -1,0 +1,70 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=dbus
+pkgver=1.10.18
+pkgrel=0
+pkgdesc="Freedesktop.org message bus system"
+url="http://www.freedesktop.org/Software/dbus"
+pkggroups="messagebus"
+arch="all"
+license="GPL custom"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-libs $pkgname-x11"
+triggers="$pkgname.trigger=/etc/dbus-1/system.d"
+depends=
+depends_dev="util-linux-dev"
+makedepends="$depends_dev expat-dev libx11-dev autoconf automake libtool"
+install="$pkgname.pre-install $pkgname.post-install"
+source="http://dbus.freedesktop.org/releases/dbus/dbus-$pkgver.tar.gz
+	fix-int64-print.patch
+	$pkgname.initd
+	"
+
+prepare() {
+	default_prepare
+	autoreconf -vif
+}
+
+build() {
+	cd "$srcdir"/$pkgname-$pkgver
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--with-xml=expat \
+		--with-dbus-user=messagebus \
+		--with-system-pid-file=/var/run/dbus.pid \
+		--disable-verbose-mode \
+		--disable-static \
+		--enable-inotify \
+		--disable-dnotify \
+		--disable-tests \
+		--disable-asserts \
+		--with-x \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$srcdir"/$pkgname-$pkgver
+	make -j1 DESTDIR="$pkgdir" install || return 1
+	install -Dm755 "$srcdir"/dbus.initd "$pkgdir"/etc/init.d/dbus
+}
+
+libs() {
+	pkgdesc="Libraries for acces D-BUS"
+	replaces="dbus"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/lib*.so.* "$subpkgdir"/usr/lib/
+}
+
+x11() {
+	pkgdesc="X11-requiring add-ons for D-BUS"
+	depends="dbus=$pkgver-r$pkgrel"
+	mkdir -p "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/bin/dbus-launch "$subpkgdir"/usr/bin/
+}
+
+sha512sums="726f97d0a2016f4f0625ba332e93e2d33bb16857cd35cb6c79da0f44fff297df948c3df62c31ffbec34713a7b85b3ff5b65f31517fe3511ddbd3bf18bd4748ed  dbus-1.10.18.tar.gz
+5f07d8cb377ab80c927a77236c3f3437f08351161e594c62a1ad43f0324c2dba3cc98d50257ae27b9a4f5148571c5f26f35db8b40f13c72e92f267d5356c87f0  fix-int64-print.patch
+df74e7d6a4f76f777d356e94bd23422b17656aa51a5b2d3c655fcabb32c84f2f06b9f5cd8827920d51842f89e8c0d968a6e723315e4bf216e55711fcda9b0ee9  dbus.initd"

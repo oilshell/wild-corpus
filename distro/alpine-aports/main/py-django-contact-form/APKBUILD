@@ -1,0 +1,35 @@
+# Contributor: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+# Maintainer: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+pkgname=py-django-contact-form
+pkgver=1.4.2
+pkgrel=0
+pkgdesc="Generic contact-form application for Django"
+url=https://bitbucket.org/ubernostrum/django-contact-form/
+arch=noarch
+license=BSD
+depends=py-django
+makedepends=py-setuptools
+source="https://files.pythonhosted.org/packages/source/d/django-contact-form/django-contact-form-$pkgver.tar.gz"
+
+_builddir=$srcdir/django-contact-form-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	python2 setup.py build
+}
+
+package() {
+	cd "$_builddir"
+	python2 setup.py install --root "$pkgdir"
+}
+
+sha512sums="7d7769161923dd5c9d05ad3c30b68195dae81f4565278cb4a84955704558084f18763991adb106e726dc590de4e3fcc4ae13e01fef6c89350b244f6878e1b36d  django-contact-form-1.4.2.tar.gz"

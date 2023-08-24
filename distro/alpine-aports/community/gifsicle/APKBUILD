@@ -1,0 +1,34 @@
+# Contributor: Isaac Dunham <ibid.ag@gmail.com>
+# Maintainer: Isaac Dunham <ibid.ag@gmail.com>
+pkgname=gifsicle
+pkgver=1.90
+pkgrel=0
+pkgdesc="Command-line tool for making, editing, and getting information about GIF animations"
+url="http://www.lcdf.org/gifsicle/"
+arch="all"
+license="GPL2"
+makedepends="libx11-dev libice-dev libsm-dev"
+subpackages="$pkgname-doc"
+source="http://www.lcdf.org/gifsicle/gifsicle-$pkgver.tar.gz"
+
+builddir="$srcdir"/gifsicle-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="a5fd815c3aa1388690199edc16c0d5c0c32257cefd1cf8a1b660024b8e2324a6b4a54e19013984f905549df42d7719cdb1a875979b77729723f70d8e43f9bab7  gifsicle-1.90.tar.gz"

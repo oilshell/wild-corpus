@@ -1,0 +1,39 @@
+# Maintainer: William Pitcock <nenolod@dereferenced.org>
+pkgname=gnome-desktop
+pkgver=3.26.0
+pkgrel=0
+pkgdesc="gnome desktop core libraries"
+url="http://www.gnome.org/"
+arch="all"
+license="GPL"
+depends_dev="gvfs-dev libgudev-dev eudev-dev iso-codes-dev 
+	gobject-introspection-dev"
+makedepends="$depends_dev xkeyboard-config itstool libxml2-utils gtk+3.0-dev libseccomp-dev
+	gsettings-desktop-schemas-dev gtk-doc py-six"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+source="http://ftp.gnome.org/pub/GNOME/sources/$pkgname/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="9d14d6b12d3435234f46d317f7481911e775223d36f0ae5887484f9e7cad6cf70f2e0c2cda14c92d3c9e082fc708f2c3524dd7ee36672bdcc12a37e8ea8ec103  gnome-desktop-3.26.0.tar.xz"

@@ -1,0 +1,30 @@
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+pkgname=re2
+pkgver=20170801
+_pkgver=${pkgver:0:4}-${pkgver:4:2}-${pkgver:6:2}
+pkgrel=0
+pkgdesc="A fast, safe, thread-friendly alternative to backtracking RE engines"
+url="https://github.com/google/re2"
+arch="all"
+license="BSD"
+subpackages="$pkgname-dev"
+source="$pkgname-$_pkgver.tar.gz::https://github.com/google/$pkgname/archive/$_pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$_pkgver"
+
+build() {
+	cd "$builddir"
+	make prefix=/usr
+}
+
+check() {
+	cd "$builddir"
+	make shared-test static-test
+}
+
+package() {
+	cd "$builddir"
+	make prefix=/usr DESTDIR="$pkgdir" install
+}
+
+sha512sums="a7b37ab1873c640e5c00cfede61c6dcc68f7efb9801524fa7d2db492c9e03eb892906b852c40c8fe370c6664e85a89cfe0a2f97ab95ed88a9d4a2aa197e1f883  re2-2017-08-01.tar.gz"

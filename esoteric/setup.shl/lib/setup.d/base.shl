@@ -1,0 +1,63 @@
+#!/bin/bash
+Setup.provide base 1.0
+
+## Function: mkpdir FILE...
+function mkpdir() {
+    local -a alldirs=( $(dirname "$@") ) missing
+    local dir
+    for dir in "${alldirs[@]}"; do
+        if [ ! -e "$dir" ]; then
+            missing+=( "$dir" )
+        fi
+    done
+    [ ${#missing[@]} -eq 0 ] || mkdir -p "${missing[@]}"
+}
+
+## Function: Trigger DEST -COMMAND ARG...
+function Trigger() { mkpdir "$1"; eval "${2#-}" >"$1" 2>&1; }
+## Function: Echo DEST ARG...
+function Echo() { local dst="$1"; shift; mkpdir "$dst"; printf "%s\n" "${@#-}" > "$dst"; }
+## Function: Copy DEST SRC
+function Copy() { mkpdir "$1"; cp "$2" "$1"; }
+## Function: Concat DEST FILE...
+function Concat() { mkpdir "$1"; cat "${@:2}" > "$1"; }
+## Function: Sorted DEST FILE...
+function Sorted() { mkpdir "$1"; cat "${@:2}" | LC_ALL=C sort -u > "$1"; }
+## Function: Lookup DEST -STRING FILE
+function Lookup() { mkpdir "$1"; set -o pipefail; LC_ALL=C look -t: "${2#-}" "$3" | head -1 | cut -d: -f2 > "$1"; }
+## Function: Empty DEST
+function Empty() { mkpdir "$1"; printf '' > "$1"; }
+## Function: Filter DEST SRC WORD_LIST [OPTIONS]
+function Filter() { mkpdir "$1"; grep $4 -xf "$3" "$2" > "$1"; return 0; }
+## Function: Foreach DEST -PATTERN
+function Foreach() {
+    local word dst="$1" pat="${2#-}"
+    shift 2
+    mkpdir "$dst"
+    local file
+    for file; do
+	for word in $(< "$file"); do
+	    eval "printf '%s\n' \"$pat\""
+	done
+    done > "$dst"
+}
+
+## Function: Tar DEST -TRANSFORM FILE...
+function Tar() {
+    local re="${2#-}" dst="$1"
+    shift 2
+    mkpdir "$dst"
+    tar -czf "$dst" --transform="$re" "$@"
+}
+## Function: GZip DEST SRC
+function GZip() { mkpdir "$1"; gzip < "$2" > "$1"; }
+
+## Function: Git.autocommit DEST
+function Git.autocommit() {
+    (
+	msg="$(Setup.params autocommit)"
+	cd "$(dirname "$1")" \
+	  && git add -A \
+	  && git commit -m "${msg:-Automatic commit on $(date)}" )
+    touch "$1"
+}

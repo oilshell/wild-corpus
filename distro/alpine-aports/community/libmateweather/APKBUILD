@@ -1,0 +1,37 @@
+# Contributor: Alan Lacerda <alacerda@alpinelinux.org>
+# Maintainer: Alan Lacerda <alacerda@alpinelinux.org>
+pkgname=libmateweather
+pkgver=1.19.1
+pkgrel=0
+pkgdesc="A library to access weather information from online services for numerous locations"
+url="https://github.com/mate-desktop/libmateweather"
+arch="all"
+license="GPL2"
+depends="mate-common"
+makedepends="libsoup-dev libtool intltool gtk+3.0-dev libxml2-utils tzdata"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+source="http://pub.mate-desktop.org/releases/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--with-zoneinfo-dir
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="f9b60eb30858780872373190d1a40a3ad015750436b3200f635e43a37c9ab9b6f29d05945bc38a7a0a623a1e1b5e0db8a9174e7251eb8ff1a99194c3b203a5ed  libmateweather-1.19.1.tar.xz"

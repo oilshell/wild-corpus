@@ -1,0 +1,30 @@
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=snappy
+pkgver=1.1.4
+pkgrel=2
+pkgdesc="Fast compression and decompression library"
+url="http://google.github.io/snappy/"
+arch="all"
+license="BSD"
+subpackages="$pkgname-dbg $pkgname-dev $pkgname-doc"
+source="https://github.com/google/snappy/releases/download/$pkgver/snappy-$pkgver.tar.gz
+	fix-UnalignedCopy64.patch
+	"
+
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure --prefix=/usr \
+		--disable-static
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="4f522f1d541e3f00d82ccaf6dda5c6ede28d4db19c53717003d8057261fe8630516ed6ff2a28615da032e0de9c6200b560ed5fce4f8714df9916d50d6a7c2178  snappy-1.1.4.tar.gz
+a086dbdfe2cb21419b33c2f8a2739224a8e843f2c6a51715100c723b9fbd9aed14bcfa791c20dae785b33ac1d1cf4812ed2c5c5d4058c5b8e56a0e004e9a8c60  fix-UnalignedCopy64.patch"

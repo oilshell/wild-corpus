@@ -1,0 +1,37 @@
+# Contributor: Alan Lacerda <alacerda@alpinelinux.org>
+# Maintainer: Alan Lacerda <alacerda@alpinelinux.org>
+pkgname=libmatemixer
+pkgver=1.18.0
+pkgrel=1
+pkgdesc="A mixer library for MATE desktop"
+url="http://git.mate-desktop.org/libmatemixer/"
+arch="all"
+license="GPL"
+makedepends="intltool glib-dev alsa-lib-dev"
+subpackages="$pkgname-doc $pkgname-dev $pkgname-lang"
+source="http://pub.mate-desktop.org/releases/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--sysconfdir=/etc \
+		--enable-static=no \
+		--prefix=/usr \
+		--enable-alsa
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="254d1ff74f036d813f9ec2b983b86a730fec0d1f2009e7d22a9d779e509aec92409225cec5ff1f7c747c468c5e40affaa67130df4bb7087d5ee61036359b4407  libmatemixer-1.18.0.tar.xz"

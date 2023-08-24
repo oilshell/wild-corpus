@@ -1,0 +1,38 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Daniel Sabogal <dsabogalcc@gmail.com>
+pkgname=libinput
+pkgver=1.8.2
+pkgrel=0
+pkgdesc="Library for handling input devices"
+url="http://www.freedesktop.org/wiki/Software/libinput/"
+arch="all"
+license="MIT"
+depends=""
+makedepends="mtdev-dev eudev-dev libevdev-dev grep"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-libs"
+options="!check"
+source="http://freedesktop.org/software/$pkgname/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--libexecdir=/usr/lib \
+		--mandir=/usr/share/man \
+		--with-udev-dir=/lib/udev \
+		--disable-documentation \
+		--disable-debug-gui \
+		--disable-libwacom \
+		--disable-tests
+	make
+}
+
+package() {
+	make DESTDIR="$pkgdir" -C "$builddir" install
+}
+
+sha512sums="555a7680cc8aaf62c5370a865f3aff0a933d42d94a3d8861c072666b02c9e1be45ea39de9a749a9575cdfb613b6150e412e18559d94d4919f21ca4680a3c76a7  libinput-1.8.2.tar.xz"

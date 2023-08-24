@@ -1,0 +1,40 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=shotwell
+pkgver=0.27.0
+pkgrel=0
+pkgdesc="A digital photo organizer designed for the GNOME desktop environment"
+url="https://wiki.gnome.org/Apps/Shotwell"
+arch="x86 x86_64 ppc64le"
+license="LGPL2.1"
+install="shotwell.post-upgrade shotwell.post-install shotwell.pre-deinstall"
+subpackages="$pkgname-lang $pkgname-doc"
+makedepends="intltool vala libgee-dev libunique3-dev webkit2gtk-dev libexif-dev
+	librsvg-dev sqlite-dev libgudev-dev dbus-glib-dev libgphoto2-dev
+	gexiv2-dev libraw-dev librsvg-dev json-glib-dev gnome-doc-utils
+	m4 gst-plugins-base-dev bash gtk+3.0-dev rest-dev desktop-file-utils
+	gcr-dev itstool libgdata-dev"
+source="https://download.gnome.org/sources/$pkgname/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--enable-static=no \
+		--disable-schemas-compile
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="e7b5fe153fff96e04507588b4b8a1e71c121787cb6d28b7e14bb31824f1a09ca1948edc4bccfa069b2ffebe1ac753580257c1af4b7aec0ed49af74944ee91fbb  shotwell-0.27.0.tar.xz"

@@ -1,0 +1,29 @@
+# Contributor: Marvin Steadfast <marvin@xsteadfastx.org>
+# Maintainer: Marvin Steadfast <marvin@xsteadfastx.org>
+pkgname=unibilium
+pkgver=1.2.1
+pkgrel=0
+pkgdesc="A terminfo parsing library"
+url="https://github.com/mauke/unibilium/"
+arch="all"
+license="LGPL3"
+depends=""
+depends_dev="libtool"
+makedepends="$depends_dev"
+subpackages="$pkgname-dev $pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/mauke/$pkgname/archive/v$pkgver.tar.gz
+	build-static-lib.patch"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	make PREFIX=/usr
+}
+
+package() {
+	cd "$builddir"
+	make PREFIX=/usr DESTDIR="$pkgdir" install
+}
+
+sha512sums="2a3e92051382cd427220f6994a49ab10966fd13e51d1ccb437d695d5556ede8ee8d1dc0e0f92871ca48c559abd6f229599df3d1c1a2d2f80fb0820686280ce79  unibilium-1.2.1.tar.gz
+68533c5e55997061ce71f1701490d078fd6a22ee83615d693e6b2fddda2d2b652ce73f5ff5335d3747f211845d4da4a80eb12733407ee071785624f94fa1d0e8  build-static-lib.patch"

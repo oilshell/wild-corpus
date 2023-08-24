@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# takes a list of numbers (line separated) and prints the total
+
+# License: LGPLv2
+# Note the input to this will probably come from `cut`,
+# so a couple of tips on cut:
+#   1. columns from `ls -l` are delimited by a variable
+#      number of spaces. You can ignore this fact by
+#      squeezing said spaces with a `tr -s ' '` before
+#      you input to cut -d' '. Generally find is much
+#      better for printing inode info than ls.
+#   2. You should probably always use the -s option to
+#      cut, so that it doesn't output lines that do not
+#      contain the delimiter
+
+tr -cd '[.\n0-9]' |   # only leave numbers
+sed '/^$/d' |         # delete any blank lines
+
+#method 1
+paste -s -d+ |
+bc                     # all but last \n --> +
+
+#method 2
+#(tr '\n' +; echo 0) |
+#bc                     # \n --> +
+
+#method 3
+#tr '\n' +             # \n --> +
+#sed 's/+$/\
+#/' |                  # last + --> \n
+#bc
+
+#method 4
+#(
+#echo 0
+#sed 's/\(.\)$/\1+/'    # \n --> +\n
+#echo p
+#) |
+#dc #5 times slower!
+
+#method 5
+#awk '{s+=$0} END {print s}'

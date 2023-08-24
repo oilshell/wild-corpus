@@ -1,0 +1,29 @@
+# Contributor: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+# Maintainer: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+pkgname=py-django-oscar
+pkgver=1.5
+pkgrel=1
+pkgdesc="Domain-driven e-commerce for Django"
+url=http://oscarcommerce.com/
+arch=noarch
+license=BSD
+depends="py-babel py-django py-django-extra-views py-django-haystack
+         py-django-phonenumber-field py-django-sorl-thumbnail py-django-tables2
+	 py-django-treebeard py-django-widget-tweaks py-factory-boy py-mock
+	 py-pillow py-purl py-unidecode"
+makedepends=py-setuptools
+source="https://files.pythonhosted.org/packages/source/d/django-oscar/django-oscar-$pkgver.tar.gz
+	"
+builddir=$srcdir/django-oscar-$pkgver
+
+build() {
+	cd "$builddir"
+	./setup.py build
+}
+
+package() {
+	cd "$builddir"
+	./setup.py install --root "$pkgdir"
+}
+
+sha512sums="43ff74f7fe3591849238154640d28c28c49c894ca650e22569163387a1e15b6b8161bd688f6da5aaabe8f55b2406d4de176f5b162c7e6d6cf2b8b0b5115df1cb  django-oscar-1.5.tar.gz"

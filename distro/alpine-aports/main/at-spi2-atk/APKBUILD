@@ -1,0 +1,37 @@
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=at-spi2-atk
+pkgver=2.26.0
+pkgrel=0
+pkgdesc="A GTK+ module that bridges ATK to D-Bus at-spi"
+url="http://www.linuxfoundation.org/en/AT-SPI_on_D-Bus"
+arch="all"
+license="LGPL2+"
+depends=""
+depends_dev="glib-dev dbus-dev atk-dev at-spi2-core-dev"
+makedepends="$depends_dev intltool"
+install=""
+subpackages="$pkgname-dev"
+source="http://download.gnome.org/sources/at-spi2-atk/${pkgver%.*}/at-spi2-atk-$pkgver.tar.xz"
+
+builddir="$srcdir"/at-spi2-atk-$pkgver
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+sha512sums="f6645638f811c9e54e1db8ab43b85955804c0a5d79157b8d9ef7684a1843f6a697a924e93caea05d6903cc7cf97ad3363c94790967e2626a36ea44c62cd38b0a  at-spi2-atk-2.26.0.tar.xz"

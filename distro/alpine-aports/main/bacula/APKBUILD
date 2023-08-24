@@ -1,0 +1,175 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Maintainer: Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=bacula
+pkgver=7.4.7
+pkgrel=4
+pkgdesc="Enterprise ready, network based backup program"
+url="http://www.bacula.org"
+arch="all"
+license="AGPL3"
+depends=""
+makedepends="autoconf mariadb-dev ncurses-dev libressl-dev postgresql-dev
+	sqlite-dev zlib-dev lzo-dev acl-dev"
+install="$pkgname.pre-install $pkgname.post-upgrade"
+subpackages="$pkgname-doc $pkgname-mysql $pkgname-pgsql $pkgname-sqlite
+	$pkgname-client $pkgname-libs"
+pkgusers="bacula"
+pkggroups="bacula"
+somask="libbaccats-$pkgver.so"
+source="http://downloads.sourceforge.net/project/$pkgname/$pkgname/$pkgver/$pkgname-$pkgver.tar.gz
+	bacula-dir.initd
+	bacula-sd.initd
+	bacula-fd.initd
+	bacula-7.4.0-path-mounted.patch
+	"
+options="!check" #no test suite provided
+builddir="$srcdir/$pkgname-$pkgver"
+
+_bworkdir="/var/lib/$pkgname"
+
+prepare () {
+	default_prepare
+
+	cd "$builddir"/autoconf
+	autoconf && cp configure ../
+}
+
+build() {
+	cd "$builddir"
+
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc/$pkgname \
+		--localstatedir=/var \
+		--mandir=/usr/share/man \
+		--docdir=/usr/share/doc \
+		--infodir=/usr/share/info \
+		--with-pid-dir=/var/run/$pkgname \
+		--with-subsys-dir=/var/lock/subsys \
+		--with-logdir=/var/log/$pkgname \
+		--enable-largefile \
+		--enable-smartalloc \
+		--disable-nls \
+		--with-openssl=/usr/include/openssl \
+		--with-postgresql \
+		--with-mysql \
+		--with-sqlite3 \
+		--with-scriptdir=/etc/$pkgname/scripts \
+		--with-working-dir=$_bworkdir \
+		--with-dir-user=$pkgname \
+		--with-dir-group=$pkgname \
+		--with-archivedir=$_bworkdir/archive \
+		--with-sd-user=$pkgname \
+		--with-sd-group=$pkgname \
+		--with-fd-user=root \
+		--with-fd-group=root
+
+	make NO_ECHO=
+}
+
+package() {
+	cd "$builddir"
+
+	make DESTDIR="$pkgdir" install
+
+	local daemon; for daemon in dir sd fd; do
+		install -Dm755 "$srcdir"/$pkgname-${daemon}.initd \
+			"$pkgdir"/etc/init.d/$pkgname-${daemon}
+	done
+
+	install -Dm644 examples/sample-query.sql \
+		"$pkgdir"/etc/$pkgname/scripts/query.sql
+
+	# Fix correct log dir
+	sed -i 's%/var/bacula/log%/var/log/bacula%' \
+		"$pkgdir"/etc/$pkgname/$pkgname-dir.conf
+
+	# Install logrotate script
+	install -Dm644 scripts/logrotate $pkgdir/etc/logrotate.d/$pkgname
+	sed -i 's%/var/bacula/log%/var/log/bacula%' \
+		"$pkgdir"/etc/logrotate.d/$pkgname
+
+	# Use shell script for catalog backup instead of perl
+	sed -i 's/make_catalog_backup.pl/make_catalog_backup/' \
+		"$pkgdir"/etc/$pkgname/$pkgname-dir.conf
+
+	local dir
+	for dir in $_bworkdir /etc/$pkgname/scripts/make_catalog_backup* \
+			/etc/$pkgname/scripts/mtx-changer*
+	do
+		chown $pkgusers.$pkggroups "$pkgdir"$dir
+	done
+
+	find "$pkgdir"/usr/lib -iname libbaccats* -type l -delete
+}
+
+_mv_backend() {
+	mkdir -p "$subpkgdir"/usr/lib
+	mkdir -p "$subpkgdir"/etc/$pkgname/scripts
+
+	mv "$pkgdir"/usr/lib/libbaccats-${1}-${pkgver}.so \
+		"$subpkgdir"/usr/lib
+
+	ln -s libbaccats-${pkgver}.so "$subpkgdir"/usr/lib/libbaccats.so
+	ln -s libbaccats-${1}-${pkgver}.so \
+		"$subpkgdir"/usr/lib/libbaccats-${pkgver}.so
+
+	mv "$pkgdir"/etc/$pkgname/scripts/*_${1}_* \
+		"$subpkgdir"/etc/$pkgname/scripts
+}
+
+mysql() {
+	pkgdesc="Bacula MySQL backend"
+	depends="$pkgname"
+
+	_mv_backend mysql
+}
+
+pgsql() {
+	pkgdesc="Bacula PGSQL backend"
+	depends="$pkgname"
+	pkgusers="postgres"
+
+	_mv_backend postgresql
+
+	local file
+	for file in create_postgresql_database make_postgresql_tables \
+			grant_postgresql_privileges
+	do
+		chown postgres "$subpkgdir"/etc/$pkgname/scripts/$file
+	done
+}
+
+sqlite() {
+	pkgdesc="Bacula SQLite backend"
+	depends="$pkgname"
+
+	_mv_backend sqlite3
+}
+
+libs() {
+	pkgdesc="Bacula libraries"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/* "$subpkgdir"/usr/lib
+}
+
+client() {
+	pkgdesc="Bacula client"
+	mkdir -p "$subpkgdir"/usr/sbin \
+		"$subpkgdir"/etc/init.d \
+		"$subpkgdir"/etc/$pkgname
+	for bin in $pkgname $pkgname-fd bconsole btraceback; do
+		mv "$pkgdir"/usr/sbin/$bin "$subpkgdir"/usr/sbin
+	done
+	mv "$pkgdir"/etc/init.d/$pkgname-fd "$subpkgdir"/etc/init.d
+	mv "$pkgdir"/etc/$pkgname/$pkgname-fd.conf "$subpkgdir"/etc/$pkgname/
+	install -d -o $pkgname -g $pkgname "$subpkgdir"/$_bworkdir
+}
+
+sha512sums="2dcffe3f02de8e7dedc11f58aeca58fb95486757579065564753376d3fab7699d7577c189d0d34f8490706d773cd6a95d42ef1f35facb95e6fff10dad085c0d0  bacula-7.4.7.tar.gz
+d54a83e8ac498201a8fe7b81631b915be1f1d9f8ad30530c0a7314569ef8f91c990b63e30fda63ae9ebb79f10104e6b827ad4eae274e84cbd3d5751b1cf493af  bacula-dir.initd
+c37a1000c99984510993d77733117e0e65c25011ca98272c9d8b5db5a976c42a3b6f57c240c708bc5657a7d5aae1b51f5d7db6a9b9cfe7b4d1ce682726dc5faf  bacula-sd.initd
+c4f7adecc164b93c119338feebc0367c07d3060099cd87b474e7325fa5840d0e36666d78f5e2b89e322a1cd2fbbefc8e1f4455ad87d7237e41d1a201457d5448  bacula-fd.initd
+2d3757236aacca421261a8866ff04b5b0151538e1462559bd1240119b1bece1d456acbba9fee86dbc6aaec7af2a52eb2c0b7490c5f371b7deb478731c74342ff  bacula-7.4.0-path-mounted.patch"

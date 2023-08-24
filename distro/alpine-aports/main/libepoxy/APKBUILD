@@ -1,0 +1,46 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libepoxy
+pkgver=1.4.3
+pkgrel=1
+pkgdesc="Direct Rendering Manager runtime library"
+url="http://github.com/anholt/libepoxy"
+arch="all"
+license="MIT"
+options="!check"  # Requires dlvsym
+depends=""
+depends_dev="libx11-dev mesa-dev"
+makedepends="$depends_dev autoconf automake libtool util-macros python3"
+install=""
+subpackages="$pkgname-dev"
+source="https://github.com/anholt/libepoxy/releases/download/$pkgver/libepoxy-$pkgver.tar.xz"
+
+prepare() {
+	cd "$builddir"
+	default_prepare
+	autoreconf -vif
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--disable-static \
+		--enable-shared
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make install DESTDIR="$pkgdir"
+}
+
+sha512sums="f5d9fc74b062a0a90aea3abd7621ee4e2e27db359b82cacfbc8df64bceb4b7e4910755a078b46793b25e89d2e87ecb75556313dbad986aa4346f763dd43d2749  libepoxy-1.4.3.tar.xz"

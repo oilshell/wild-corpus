@@ -1,0 +1,111 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=graphviz
+pkgver=2.40.1
+pkgrel=0
+pkgdesc="Graph Visualization Tools"
+url="http://www.graphviz.org/"
+arch="all"
+license="EPL"
+depends=""
+depends_dev="zlib-dev libpng-dev libjpeg-turbo-dev expat-dev
+	fontconfig-dev libsm-dev libxext-dev cairo-dev pango-dev
+	librsvg-dev gmp-dev freetype-dev"
+makedepends="$depends_dev flex swig python2-dev m4 libtool
+	bison gtk+2.0-dev python2-dev lua5.2-dev libltdl"
+install="$pkgname.pre-deinstall"
+triggers="$pkgname.trigger=/usr/lib/graphviz"
+subpackages="$pkgname-dev $pkgname-doc py-gv:py lua-$pkgname:_lua
+	$pkgname-gtk $pkgname-graphs"
+source="http://www.graphviz.org/pub/graphviz/stable/SOURCES/graphviz-$pkgver.tar.gz
+	$pkgname.trigger
+	0001-clone-nameclash.patch
+	"
+
+builddir="$srcdir"/graphviz-$pkgver
+
+build() {
+	cd "$builddir"
+
+	LIBPOSTFIX=/ \
+	LUA=lua5.2 \
+	LUA_CFLAGS="$(pkg-config --cflags lua5.2)" \
+	LUA_LIBS="$(pkg-config --libs lua5.2)" \
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--without-included-ltdl \
+		--disable-ltdl-install \
+		--disable-silent-rules \
+		--enable-ltdl \
+		--with-x \
+		--disable-static \
+		--disable-dependency-tracking \
+		--enable-lua=yes \
+		--without-mylibgd \
+		--with-ipsepcola \
+		--with-pangocairo \
+		--with-gdk-pixbuf \
+		--with-png \
+		--with-jpeg \
+		--with-rsvg \
+		|| return 1
+
+	if [ "$CARCH" = "x86_64" ]; then
+		# the configure script thinks we have sincos. we dont.
+		sed -i -e '/HAVE_SINCOS/d' config.h || return 1
+	fi
+
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" \
+		pkgconfigdir=/usr/lib/pkgconfig \
+		install || return 1
+
+	mkdir -p "$pkgdir"/usr/share/doc
+	mv "$pkgdir"/usr/share/graphviz/doc \
+		"$pkgdir"/usr/share/doc/graphviz || return 1
+}
+
+py() {
+	pkgdesc="Python extension for graphviz"
+	mkdir -p "$subpkgdir"/usr/lib/graphviz \
+		"$subpkgdir"/usr/lib || return 1
+	mv "$pkgdir"/usr/lib/graphviz/python* \
+		"$subpkgdir"/usr/lib/graphviz || return 1
+	mv "$pkgdir"/usr/lib/python* "$subpkgdir"/usr/lib/
+}
+
+_lua() {
+	pkgdesc="Lua extension for graphviz"
+	mkdir -p "$subpkgdir"/usr/lib/graphviz \
+		"$subpkgdir"/usr/lib/lua || return 1
+	mv "$pkgdir"/usr/lib/graphviz/lua \
+		"$subpkgdir"/usr/lib/graphviz || return 1
+	mv "$pkgdir"/usr/lib/lua "$subpkgdir"/usr/lib/
+}
+
+gtk() {
+	pkgdesc="Gtk extension for graphviz"
+	mkdir -p "$subpkgdir"/usr/lib/graphviz || return 1
+	mv "$pkgdir"/usr/lib/graphviz/libgvplugin_g?k* \
+		"$pkgdir"/usr/lib/graphviz/libgvplugin_rsvg* \
+		"$subpkgdir"/usr/lib/graphviz || return 1
+}
+
+graphs() {
+	pkgdesc="Demo graphs for graphviz"
+	mkdir -p "$subpkgdir"/usr/share/graphviz || return 1
+	mv "$pkgdir"/usr/share/graphviz/graphs \
+		"$subpkgdir"/usr/share/graphviz/
+}
+
+sha512sums="a3f358a7050523a39b91a259563a95925b37853ffec799e571211af5b686d3af42457c937882954482785745d90416b1abd945caf05f8abb52b3876e07aa70f5  graphviz-2.40.1.tar.gz
+50947e6a11929f724759266f7716d52d10923eba6d59704ab39e4bdf18f8471d548c2b11ab051dd4b67cb82742aaf54d6358890d049d5b5982f3383b65f7ae8c  graphviz.trigger
+aa4cbc341906a949a6bf78cadd96c437d6bcc90369941fe03519aa4447731ecbf6063a0dd0366d3e7aaadf22b69e4bcab3f8632a7da7a01f8e08a3be05c2bc5d  0001-clone-nameclash.patch"

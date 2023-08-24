@@ -1,0 +1,402 @@
+#!/bin/bash
+#Load the whole script into memory.
+{
+	#////////////////////////////////////
+	# DietPi Update
+	#
+	#////////////////////////////////////
+	# Created by Daniel Knight / daniel.knight@dietpi.com / dietpi.com
+	#
+	#////////////////////////////////////
+	#
+	# Info:
+	# - Updates DietPi from Git
+	# - Uses patch_file for online pactching
+	#
+	# Usage:
+	# - dietpi-update   = Normal
+	# - dietpi-update 1 = forced update
+	# - dietpi-update 2 = Check for updates. print server_version to /DietPi/dietpi/.update_available (-1=new image required)
+	#////////////////////////////////////
+
+	INPUT=0
+	if [[ $1 =~ ^-?[0-9]+$ ]]; then
+
+		INPUT=$1
+
+	fi
+
+	#Import DietPi-Globals ---------------------------------------------------------------
+	. /DietPi/dietpi/func/dietpi-globals
+	G_CHECK_ROOT_USER
+	G_CHECK_ROOTFS_RW
+	export G_PROGRAM_NAME='DietPi-Update'
+	#Import DietPi-Globals ---------------------------------------------------------------
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#GIT Branch | master / testing
+	#/////////////////////////////////////////////////////////////////////////////////////
+	GITBRANCH=$(grep -m1 '^DEV_GITBRANCH=' /DietPi/dietpi.txt | sed 's/.*=//')
+	GITFORKOWNER=$(grep -m1 '^DEV_GITOWNER=' /DietPi/dietpi.txt | sed 's/.*=//')
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#UPDATE Vars
+	#/////////////////////////////////////////////////////////////////////////////////////
+	FP_LOG='/var/tmp/dietpi/logs/dietpi-update.log'
+	DIETPIUPDATE_COREVERSION_CURRENT=6 # Version of dietpi-update / set server_version-6 line one to value++ and obsolete previous dietpi-update scripts
+
+	FILEPATH_TEMP="/tmp/dietpi-update"
+
+	SERVER_ONLINE=0
+	UPDATE_AVAILABLE=0
+	UPDATE_REQUIRESNEWIMAGE=0
+	RUN_UPDATE=0
+
+	COREVERSION_CURRENT=0
+	SUBVERSION_CURRENT=0
+
+	COREVERSION_SERVER=0
+	SUBVERSION_SERVER=0
+
+	URL_MIRROR_INDEX=0
+	URL_MIRROR_SERVERVERSION=(
+
+		"http://dietpi.com/downloads/dietpi-update_mirror/$GITBRANCH/server_version-6"
+		"https://raw.githubusercontent.com/${GITFORKOWNER:-Fourdee}/DietPi/$GITBRANCH/dietpi/server_version-6"
+
+	)
+
+	URL_MIRROR_ZIP=(
+
+		"http://dietpi.com/downloads/dietpi-update_mirror/$GITBRANCH/DietPi-$GITBRANCH.zip"
+		"https://github.com/${GITFORKOWNER:-Fourdee}/DietPi/archive/$GITBRANCH.zip"
+
+	)
+
+	Get_Client_Version(){
+
+		COREVERSION_CURRENT=$(sed -n 1p /DietPi/dietpi/.version)
+		SUBVERSION_CURRENT=$(sed -n 2p /DietPi/dietpi/.version)
+
+	}
+
+	Get_Server_Version(){
+
+		#Get server version file
+		for ((i=0; i<${#URL_MIRROR_SERVERVERSION[@]}; i++))
+		do
+
+			URL_MIRROR_INDEX=$i
+
+			G_DIETPI-NOTIFY 2 "Checking Mirror : ${URL_MIRROR_SERVERVERSION[$i]}"
+			curl -k -L ${URL_MIRROR_SERVERVERSION[$i]} > "$FILEPATH_TEMP"/server_version
+			if (( $? == 0 )); then
+
+				#Get server Version info
+				COREVERSION_SERVER=$(sed -n 1p "$FILEPATH_TEMP"/server_version)
+				SUBVERSION_SERVER=$(sed -n 2p "$FILEPATH_TEMP"/server_version)
+
+				#Check if server_version is a valid interger.
+				if [[ $SUBVERSION_SERVER =~ ^-?[0-9]+$ ]]; then
+
+					SERVER_ONLINE=1
+					G_DIETPI-NOTIFY 0 "Using update server: ${URL_MIRROR_SERVERVERSION[$i]}"
+
+					break
+
+				else
+
+					G_DIETPI-NOTIFY 2 "Invalid server version and/or update file unavailable"
+
+				fi
+
+			else
+
+				G_DIETPI-NOTIFY 2 "No response from: ${URL_MIRROR_SERVERVERSION[$i]}"
+
+			fi
+
+		done
+
+	}
+
+	Check_Update_Available(){
+
+		#Clear previous .update_available file
+		rm /DietPi/dietpi/.update_available &> /dev/null
+
+		#Server online?
+		if (( $SERVER_ONLINE )); then
+
+			#Update Requires new image?
+			if (( $DIETPIUPDATE_COREVERSION_CURRENT < $COREVERSION_SERVER )); then
+
+				UPDATE_REQUIRESNEWIMAGE=1
+				echo -e "-1" > /DietPi/dietpi/.update_available
+
+			#Update available
+			elif (( $SUBVERSION_CURRENT < $SUBVERSION_SERVER )); then
+
+				UPDATE_AVAILABLE=1
+				echo -e ""
+				G_DIETPI-NOTIFY 0 "Update available"
+				G_DIETPI-NOTIFY 2 "Current Version : $COREVERSION_CURRENT.$SUBVERSION_CURRENT"
+				G_DIETPI-NOTIFY 2 "Server Version  : $COREVERSION_SERVER.$SUBVERSION_SERVER"
+
+				#Write update available version to file.
+				cat << _EOF_ > /DietPi/dietpi/.update_available
+$COREVERSION_SERVER.$SUBVERSION_SERVER
+_EOF_
+
+			fi
+
+		else
+
+			G_DIETPI-NOTIFY 1 "Unable to access update servers. Please check your connection, then run dietpi-update again."
+			exit 1
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# MENUS
+	#/////////////////////////////////////////////////////////////////////////////////////
+	WHIP_BACKTITLE='DietPi-Update'
+	WHIP_TITLE=$WHIP_BACKTITLE
+	CHOICE=0
+	OPTION=0
+
+	Menu_Update(){
+
+		whiptail --title "$WHIP_TITLE" --yesno "Update available   : https://goo.gl/G9ikqn
+Installed version  : $COREVERSION_CURRENT.$SUBVERSION_CURRENT
+Latest version     : $COREVERSION_SERVER.$SUBVERSION_SERVER
+
+---------------------------------Notice-------------------------------------
+The benefit of DietPi is we use standard linux configurations and commands. The downside is we can't possibly accommodate or predict, every modifcation to Linux configurations files by the end user, during the update.
+
+Although we test the updates thoroughly, if you have made custom changes to Linux configuration files, outside of the DietPi programs, we highly recommend you create a backup of your system, before updating.
+
+You can create a system backup, by running:
+ - dietpi-backup
+----------------------------------------------------------------------------
+
+Do you wish to continue and update DietPi to v$COREVERSION_SERVER.$SUBVERSION_SERVER?" --yes-button "Ok" --no-button "Exit" --defaultno --backtitle "$WHIP_BACKTITLE" 24 80
+		CHOICE=$?
+		if (( $CHOICE == 0 )); then
+
+			RUN_UPDATE=1
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Update DietPi
+	#/////////////////////////////////////////////////////////////////////////////////////
+
+	Run_Update(){
+
+		#git clone Zip method (no need to install GIT)
+		curl -k -L ${URL_MIRROR_ZIP[$URL_MIRROR_INDEX]} > "$FILEPATH_TEMP"/update.zip
+		if (( $? == 0 )); then
+
+			unzip "$FILEPATH_TEMP"/update.zip -d "$FILEPATH_TEMP"/
+
+			#Remove setting files from git that are not to be updated on client
+			rm "$FILEPATH_TEMP"/DietPi-"$GITBRANCH"/dietpi/.* &> /dev/null
+
+			#Remove folders of "non-critical scripts" before updating them. (eg: so we dont need to patch for /conf/* file removals)
+			# rm -R /DietPi/dietpi/conf #:https://github.com/Fourdee/DietPi/issues/905#issuecomment-298241622
+			# rm -R /DietPi/dietpi/func
+			# rm -R /DietPi/dietpi/misc
+
+			#Copy downloaded DietPi to Ramdisk
+			cp -Rf "$FILEPATH_TEMP"/DietPi-"$GITBRANCH"/dietpi /DietPi/
+
+			#Allow execute of all DietPi scripts and patch file
+			chmod -R +x /DietPi
+
+			#Verify/update dietpi.txt entries:
+			/DietPi/dietpi/func/dietpi-set_software verify_dietpi.txt
+
+			#Run Patch file
+			while (( $SUBVERSION_CURRENT < $SUBVERSION_SERVER )); do
+
+				G_DIETPI-NOTIFY 3 'DietPi-Update Updating DietPi'
+				G_DIETPI-NOTIFY 2 "Current Version : $COREVERSION_CURRENT.$SUBVERSION_CURRENT"
+				G_DIETPI-NOTIFY 2 "Server Version  : $COREVERSION_SERVER.$SUBVERSION_SERVER\n"
+
+				#Run patch file
+				G_DIETPI-NOTIFY 2 "Patching $COREVERSION_CURRENT.$SUBVERSION_CURRENT to $COREVERSION_CURRENT.$(( $SUBVERSION_CURRENT + 1 ))"
+				/DietPi/dietpi/patch_file $SUBVERSION_CURRENT $SUBVERSION_SERVER
+
+				#Update Local Version ID
+				((SUBVERSION_CURRENT++))
+				cat << _EOF_ > /DietPi/dietpi/.version
+$COREVERSION_CURRENT
+$SUBVERSION_CURRENT
+_EOF_
+
+				G_DIETPI-NOTIFY 0 "Patch $COREVERSION_CURRENT.$SUBVERSION_CURRENT completed\n"
+
+				Get_Client_Version
+
+			done
+
+			#Remove Patch files.
+			rm /DietPi/dietpi/patch_file &> /dev/null
+			rm /DietPi/dietpi/server_version &> /dev/null
+
+			#Remove temp
+			rm -R "$FILEPATH_TEMP" &> /dev/null
+
+		#Unable to download file.
+		else
+
+			G_DIETPI-NOTIFY 1 "Download failed, unable to run update. Please try running dietpi-update again."
+			exit 1
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Main Loop
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#----------------------------------------------------------------
+	#Inform user
+	G_DIETPI-NOTIFY 3 DietPi-Update 'Checking for DietPi updates'
+	#----------------------------------------------------------------
+	#Create temp directory used in dietpi-update
+	rm -R "$FILEPATH_TEMP" &> /dev/null
+	mkdir -p "$FILEPATH_TEMP" &> /dev/null
+	#----------------------------------------------------------------
+	#Get versions
+	Get_Client_Version
+	Get_Server_Version
+	#----------------------------------------------------------------
+	#Check if update is available
+	Check_Update_Available
+	#----------------------------------------------------------------
+	#Check for updates only. Send result to global file for use by dietpi-banner.
+	if (( $INPUT == 2 )); then
+
+		echo -e "Do nothing, now contained within Check_Update_Available()" &> /dev/null
+
+	#----------------------------------------------------------------
+	#Run menus / prompts / updates
+	else
+
+		#----------------------------------------------------------------
+		#Server offline
+		if (( $SERVER_ONLINE == 0 )); then
+
+			whiptail --title "Error - Server Offline" --msgbox "http://github.com is either offline, or, unable to connect \n \n No updates applied." 12 60
+
+		#Update requires new DietPi image
+		elif (( $UPDATE_REQUIRESNEWIMAGE == 1 )); then
+
+			#Cannot update, Image required
+			whiptail --title "New image required" --msgbox " Your version of DietPi is now obsolete and cannot be updated. \n\n Please download the latest DietPi image:\n - http://dietpi.com/downloads/images \n\n - Current Version : $SUBVERSION_CURRENT \n - Server Version  : $SUBVERSION_SERVER \n " 13 70
+
+			G_DIETPI-NOTIFY 1 "Your version of DietPi is now obsolete and cannot be updated."
+			echo -e "Please download the latest DietPi image:\n - http://dietpi.com/download \n\n - Current Version : $SUBVERSION_CURRENT \n - Server Version  : $SUBVERSION_SERVER \n "
+
+		#Update available
+		elif (( $UPDATE_AVAILABLE == 1 )); then
+
+			#Insufficient free space
+			/DietPi/dietpi/dietpi-drive_manager 2
+			if (( $? != 0 )); then
+
+				echo 1 &> /dev/null #exit normally for delete []
+
+			#Forced update
+			elif (( $INPUT == 1 )); then
+
+				G_DIETPI-NOTIFY 0 "Updates have been found and are being applied, please wait..."
+				G_DIETPI-NOTIFY 2 "Current Version : $COREVERSION_CURRENT.$SUBVERSION_CURRENT"
+				G_DIETPI-NOTIFY 2 "Server Version  : $COREVERSION_SERVER.$SUBVERSION_SERVER"
+
+				RUN_UPDATE=1
+
+			#Ask for update
+			else
+
+				Menu_Update
+
+			fi
+
+		#No Updates
+		else
+
+			echo -e ""
+			G_DIETPI-NOTIFY 0 "No updates required, your DietPi installation is up to date.\n"
+			G_DIETPI-NOTIFY 2 "Current Version : $COREVERSION_CURRENT.$SUBVERSION_CURRENT"
+			G_DIETPI-NOTIFY 2 "Server Version  : $COREVERSION_SERVER.$SUBVERSION_SERVER"
+			sleep 2
+
+		fi
+
+		#----------------------------------------------------------------
+		#Run Update
+		if (( $RUN_UPDATE == 1 )); then
+
+			#Stop Services
+			/DietPi/dietpi/dietpi-services stop
+
+			# - PiHole, restart service if installed to prevent loss of DNS during updates: https://github.com/Fourdee/DietPi/issues/1138
+			if [ -f /DietPi/dietpi/.installed ] &&
+				(( $(cat /DietPi/dietpi/.installed | grep -ci -m1 '^aSOFTWARE_INSTALL_STATE\[93\]=2') )); then
+
+				systemctl start dnsmasq
+				sleep 2
+
+			fi
+
+			#Run update and patcher
+			rm "$FP_LOG" &> /dev/null
+
+			Run_Update | tee -a "$FP_LOG"
+
+			#.update file stage (only used on 1st run of dietpi-software to check/apply updates, 0 tells dietpi-software to reboot)
+			echo 0 > /DietPi/dietpi/.update_stage
+
+			#Remove update_available file
+			rm /DietPi/dietpi/.update_available &> /dev/null
+
+			#Sync to disk now: http://dietpi.com/phpbb/viewtopic.php?f=9&t=2591
+			sync
+
+			#Done
+			G_DIETPI-NOTIFY 3 DietPi-Update "Completed"
+			G_DIETPI-NOTIFY 2 "Current Version : $COREVERSION_CURRENT.$SUBVERSION_CURRENT"
+			G_DIETPI-NOTIFY 2 "Server Version  : $COREVERSION_SERVER.$SUBVERSION_SERVER"
+			G_DIETPI-NOTIFY 0 "Update completed"
+			echo -e ""
+			echo -e "Please reboot your system now, using the command \e[31;49;1mreboot\e[0m"
+
+		fi
+
+		#----------------------------------------------------------------
+		#Desktop Run, exit key prompt
+		if (( $(ps aux | grep -ci -m1 '[l]xpanel') == 1 )); then
+
+			read -p "Press any key to exit DietPi-Update..."
+
+		fi
+
+	fi
+
+	#----------------------------------------------------------------
+	#Clear temp files and folders
+	rm -R "$FILEPATH_TEMP" &> /dev/null
+	#----------------------------------------------------------------
+	unset URL_MIRROR_SERVERVERSION
+	unset URL_MIRROR_ZIP
+	#----------------------------------------------------------------
+	exit 0
+	#----------------------------------------------------------------
+}

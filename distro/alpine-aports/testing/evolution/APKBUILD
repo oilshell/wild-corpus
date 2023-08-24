@@ -1,0 +1,50 @@
+# Contributor: William Pitcock <nenolod@dereferenced.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=evolution
+pkgver=3.26.0
+pkgrel=0
+pkgdesc="evolution mail client"
+url="http://projects.gnome.org/evolution"
+# limited by webkit2gtk
+arch="x86 x86_64 ppc64le aarch64 armhf"
+license="GPL"
+depends="highlight gsettings-desktop-schemas"
+depends_dev="itstool libxml2-dev gcr-dev enchant-dev libcanberra-dev
+	libgweather-dev openldap-dev libnotify-dev"
+makedepends="$depends_dev gperf flex bison libxml2-utils glib-dev
+	webkit2gtk-dev gtkspell3-dev evolution-data-server-dev glib-dev
+	gtk+3.0-dev nss-dev cmake gnu-libiconv-dev gsettings-desktop-schemas-dev"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+source="http://ftp.gnome.org/pub/gnome/sources/${pkgname}/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz"
+builddir="${srcdir}/${pkgname}-${pkgver}"
+
+build() {
+	mkdir -p "$builddir"/build
+	cd "$builddir"/build
+	CFLAGS="$CFLAGS -I/usr/include/gnu-libiconv" \
+	cmake \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=/usr/lib \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DENABLE_GNOME_DESKTOP=OFF \
+		-DENABLE_AUTOAR=OFF \
+		-DENABLE_LIBCRYPTUI=OFF \
+		-DENABLE_YTNEF=OFF \
+		-DENABLE_PST_IMPORT=OFF \
+		-DENABLE_NSS=ON \
+		-DENABLE_SMIME=ON \
+		..
+	make
+}
+
+check() {
+	cd "$builddir"/build
+	make check
+}
+
+package() {
+	cd "$builddir"/build
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="297554495afcbfa681bf3108ec0f3c208c68d1fab181d283e9131ca0a3ed8301f631e69f1bcec0592296a023dadec991babf7b0194f6e47a9455a1e1642a5740  evolution-3.26.0.tar.xz"

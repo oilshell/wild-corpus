@@ -1,0 +1,377 @@
+#!/bin/bash
+{
+	#////////////////////////////////////
+	# DietPi Bug Report Script
+	#
+	#////////////////////////////////////
+	# Created by Daniel Knight / daniel.knight@dietpi.com / dietpi.com
+	#
+	#////////////////////////////////////
+	#
+	# Info:
+	# - filename /DietPi/dietpi/dietpi-bugreport
+	# - Generates MACADDRESS_BUGNUMBER.zip and uploads to dietpi.com
+	#////////////////////////////////////
+
+	#Import DietPi-Globals ---------------------------------------------------------------
+	. /DietPi/dietpi/func/dietpi-globals
+	G_CHECK_ROOT_USER
+	G_CHECK_ROOTFS_RW
+	export G_PROGRAM_NAME='DietPi-Bugreport'
+	#Import DietPi-Globals ---------------------------------------------------------------
+
+	# - byte
+	UPLOAD_FILESIZE_LIMIT=83886080
+	UPLOAD_FILESIZE=0
+
+	DATE_CURRENT=$(date +"%d-%m-%Y")
+
+	ONLINE_BUG_REPORT=1
+	CREATE_BUG_REPORT=0
+	BUG_REPORT_COMPLETED=0
+
+	UNIQUE_ID_HW=$(sed -n 5p /DietPi/dietpi/.hw_model)
+	UNIQUE_ID_BUGNUMBER=0
+	INTERNET_AVAILABLE=0
+
+	FTP_ADDR="dietpi.com"
+	FTP_USER="dietpi-survey"
+	FTP_PASS="raspberry13"
+
+	FILEPATH_TEMP="/tmp/dietpi-bugreport"
+
+	FILE_GENERATED_ZIP="bugreport.zip"
+	FILE_BUGREPORT_TEXT="bugreport.txt"
+	FILE_BUG_NUMBER="/DietPi/dietpi/.bug_id"
+
+	Generate_Template_Doc(){
+
+		cat << _EOF_ > "$FILE_BUGREPORT_TEXT"
+----------------------------------------------------------------
+ DietPi : Bug Report
+ #Date
+----------------------------------------------------------------
+ Please fill out the information regarding your issue.
+
+ When completed, save and exit nano:
+ - Press CTRL+X
+ - Press Y
+ - Press Enter
+
+----------------------------------------------------------------
+ Your contact information
+----------------------------------------------------------------
+Email address =
+Name          =
+
+
+----------------------------------------------------------------
+ Short Description of the issue (eg: Desktop wont start):
+----------------------------------------------------------------
+
+
+----------------------------------------------------------------
+ When does the issue occur? (eg: I tried to run startx):
+----------------------------------------------------------------
+
+
+----------------------------------------------------------------
+ Error Codes (if applicable):
+----------------------------------------------------------------
+
+
+----------------------------------------------------------------
+ Additional Notes:
+----------------------------------------------------------------
+
+
+End of Line ;)
+_EOF_
+
+		#Set date inside bugreport text
+		sed -i "/#Date/c\ $DATE_CURRENT" "$FILE_BUGREPORT_TEXT"
+
+	}
+
+	Generate_Zip_File(){
+
+		#----------------------------------------------------------------
+		#Define zip settings (level 9 compression etc)
+		local zip_settings="-9"
+
+		#Online - Update file name format to send
+		if (( $ONLINE_BUG_REPORT == 1 )); then
+
+			FILE_GENERATED_ZIP="bugreport-$UNIQUE_ID_HW-$UNIQUE_ID_BUGNUMBER.zip"
+
+		#Offline
+		else
+
+			FILE_GENERATED_ZIP="bugreport.zip"
+
+		fi
+
+		#----------------------------------------------------------------
+		#Add User's text document
+		zip "$zip_settings" "$FILE_GENERATED_ZIP" "$FILE_BUGREPORT_TEXT"
+
+		#list of files and/or folders we want to zip
+		local afile_list=(
+
+			# - logs
+			"/var/log/*"
+
+			# - DietPi scripts / logs
+			"/DietPi/*"
+			"/boot/dietpi.txt"
+			"/boot/config.txt"
+			"/boot/dietpi/*"
+			"/var/tmp/dietpi/logs/*"
+
+			# - /var/lib/dietpi
+			"/var/lib/dietpi/*"
+
+			# - confs
+			"/etc/X11/xorg.conf"
+			"/etc/bash.bashrc"
+			"/etc/rc.local"
+			"/etc/asound.conf"
+			"/etc/network/interfaces"
+			"/etc/fstab"
+			"/etc/dphys-swapfile"
+			"/etc/sysctl.conf"
+			"/etc/sysctl.d/*"
+
+			"/root/.bashrc"
+
+			# - Services
+			"/etc/init.d/*"
+			"/etc/systemd/*"
+
+			# - Locale
+			"/etc/apt/sources.list"
+			"/etc/apt/sources.list.d/*"
+
+		)
+
+		for ((i=0; i<${#afile_list[@]}; i++))
+		do
+
+			zip -r "$zip_settings" "$FILE_GENERATED_ZIP" ${afile_list[$i]}
+
+		done
+
+		unset afile_list
+
+		#List of commands we want to run and redirect to zip
+		local acommand_list=(
+
+			"ls -lha /var/log"
+			"dpkg -l"
+			"ifconfig -a"
+			"iwconfig"
+			"ip a"
+			"lsusb"
+			"cat /proc/cpuinfo"
+			"ps aux"
+			"blkid"
+			"mount"
+			"df -h"
+			"ls /etc/rc*.d/"
+			"cut -d: -f1 /etc/passwd"
+			"locale"
+			"ls -lha /mnt" #dietpi userdata location
+			"dmesg"
+			"lsmod"
+			"systemctl status *.service -l"
+			"systemctl status *.mount -l"
+			"/DietPi/dietpi/dietpi-services status"
+
+		)
+
+		for ((i=0; i<${#acommand_list[@]}; i++))
+		do
+
+			${acommand_list[$i]} > command_output_$i.txt
+			zip -r "$zip_settings" "$FILE_GENERATED_ZIP" command_output_$i.txt
+			rm command_output_$i.txt
+
+		done
+
+		unset acommand_list
+
+	}
+
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Main Loop
+	#/////////////////////////////////////////////////////////////////////////////////////
+
+	#----------------------------------------------------------------
+	#Make Directory
+	#we need to work inside the directory as Wput cant accept /paths
+	mkdir -p "$FILEPATH_TEMP"
+	cd "$FILEPATH_TEMP"
+	#----------------------------------------------------------------
+	#Check if we have a working internet connection beforehand
+	G_CHECK_URL "$FTP_ADDR"
+	if (( $? == 0 )); then
+
+		INTERNET_AVAILABLE=1
+
+	fi
+
+	# - Prompt user if they wish to continue. Offline mode. No Network.
+	if (( $INTERNET_AVAILABLE == 0 )); then
+
+		clear
+
+		whiptail --title "Offline" --yesno "Error: Unable to connect to $FTP_ADDR\n- Make sure a network device is installed.\n- Check your network connection is functional.\n- $FTP_ADDR may be offline.\n\n Would you like to generate an offline bug report?\n - /DietPi/bugreport.zip" --yes-button "Ok" --no-button "Exit" --defaultno --backtitle "DietPi Bug Report" 14 70
+		CHOICE=$?
+		if (( $CHOICE == 0 )); then
+
+			ONLINE_BUG_REPORT=0
+			CREATE_BUG_REPORT=1
+
+		fi
+
+	# - Prompt user if they wish to continue. Online Upload.
+	else
+
+		whiptail --title "Send DietPi Bug Report?" --yesno "DietPi will generate and upload a bug report for your system.\n\nThis file will contain:\n- Your description of the bug/issue.\n- DietPi settings.\n- Log files.\n- Config files specific to DietPi.\n\nDo you wish to continue?" --yes-button "Ok" --no-button "Exit" --defaultno --backtitle "DietPi Bug Report" 15 70
+		CHOICE=$?
+		if (( $CHOICE == 0 )); then
+
+			ONLINE_BUG_REPORT=1
+			CREATE_BUG_REPORT=1
+
+		fi
+
+	fi
+
+	#----------------------------------------------------------------
+	#Create Bug Report
+	if (( $CREATE_BUG_REPORT == 1 )); then
+
+		#----------------------------------------------------------------
+		#Copy template if a previous bugreport.txt file does not exists.
+		if [ ! -f "$FILE_BUGREPORT_TEXT" ]; then
+
+			Generate_Template_Doc
+
+		fi
+
+		#Load up template text file for user to input information
+		nano "$FILE_BUGREPORT_TEXT"
+
+		#----------------------------------------------------------------
+		#Load .bug_id
+		if [ -f "$FILE_BUG_NUMBER" ]; then
+
+			UNIQUE_ID_BUGNUMBER=$(cat "$FILE_BUG_NUMBER")
+
+		fi
+
+		#----------------------------------------------------------------
+		#Generate our zipped bugreport file
+		Generate_Zip_File
+
+		#----------------------------------------------------------------
+		#Offline Mode - store zip to /DietPi/bugreport.zip
+		if (( $ONLINE_BUG_REPORT == 0 )); then
+
+			#copy offline bug report to /boot
+			rm /DietPi/bugreport.zip  &> /dev/null
+			cp "$FILE_GENERATED_ZIP" /DietPi/bugreport.zip &> /dev/null
+
+			BUG_REPORT_COMPLETED=1
+
+		#Online Mode, Upload .zip to server.
+		else
+
+			#Check upload location is online
+			G_CHECK_URL "$FTP_ADDR"
+			if (( $? == 0 )); then
+
+				#Limit filesize to 10MB
+				UPLOAD_FILESIZE=$(stat -c%s "$FILE_GENERATED_ZIP")
+
+				# - File too big
+				if (( $UPLOAD_FILESIZE > $UPLOAD_FILESIZE_LIMIT )); then
+
+					BUG_REPORT_COMPLETED=-2
+
+				# - upload to server
+				else
+
+					G_DIETPI-NOTIFY 2 "Uploading bug report, please wait..."
+					wput --timeout=10th-4 --tries=1 --waitretry=2 -B -u "$FILE_GENERATED_ZIP" ftp://"$FTP_USER":"$FTP_PASS"@"$FTP_ADDR"
+					BUG_REPORT_COMPLETED=1
+
+				fi
+
+			else
+
+				BUG_REPORT_COMPLETED=-1
+
+			fi
+		fi
+
+	fi
+
+	#----------------------------------------------------------------
+	#Bug report generated / sent. Inform user
+	if (( $BUG_REPORT_COMPLETED == 1 )); then
+
+		#Inform user
+		if (( $ONLINE_BUG_REPORT == 0 )); then
+
+			whiptail --title "Bug Report Created" --msgbox "Your offline bug report has been generated:\n - /DietPi/bugreport.zip\n\nContact DietPi for support using one of the below:\n- Github Issue : https://github.com/Fourdee/DietPi/issues\n- RPi Forum    : https://goo.gl/QzyTVm\n- Odroid Forum : http://goo.gl/26owYc\n- DietPi Forum : http://dietpi.com/phpbb/viewforum.php?f=9" --backtitle "DietPi Bug Report" 16 70
+			/DietPi/dietpi/dietpi-banner 1
+			echo -e "\n Bug report generated. /DietPi/bugreport.zip \n "
+
+		else
+
+			#inform user of their unique ID that can be used to track issue
+			whiptail --title "Bug Report Sent" --msgbox "Your bug report has been sent.\nPlease make note of your reference code below. This will need to be used when contacting DietPi for support.\n\n Reference CODE: $UNIQUE_ID_HW-$UNIQUE_ID_BUGNUMBER \n\nContact DietPi for support using one of the below:\n- Github Issue : https://github.com/Fourdee/DietPi/issues\n- RPi Forum    : https://goo.gl/QzyTVm\n- Odroid Forum : http://goo.gl/26owYc\n- DietPi Forum : http://dietpi.com/phpbb/viewforum.php?f=9" --backtitle "DietPi Bug Report" 18 70
+
+			#Print to terminal aswell
+			/DietPi/dietpi/dietpi-banner 1
+			echo -e "\n Bug report Sent. Thank you.\n Your reference code: $UNIQUE_ID_HW-$UNIQUE_ID_BUGNUMBER \n"
+
+		fi
+
+		#Update local Bug number Id
+		((UNIQUE_ID_BUGNUMBER++))
+		echo -e "$UNIQUE_ID_BUGNUMBER" > "$FILE_BUG_NUMBER"
+
+	#Failed to upload - Connection error
+	elif (( $BUG_REPORT_COMPLETED == -1 )); then
+
+			whiptail --title "Upload failed" --msgbox "Error: Unable to upload Bug report.\n\nConnection to $FTP_ADDR has failed:\n- Check your network connection is functional.\n- Please try again later." --backtitle "DietPi Bug Report" 12 70
+			/DietPi/dietpi/dietpi-banner 1
+
+	#Failed to upload - Filesize too big
+	elif (( $BUG_REPORT_COMPLETED == -2 )); then
+
+			whiptail --title "Bug report upload failed" --msgbox "Error: Bug report file exceeds size limit\n - Max size = $(( $UPLOAD_FILESIZE_LIMIT / 1024 / 1024 ))MB\n - Bug report size = $(( $UPLOAD_FILESIZE / 1024 / 1024 ))MB\n\nThis bug report has NOT been sent." --backtitle "DietPi Bug Report" 12 60
+			/DietPi/dietpi/dietpi-banner 1
+
+	#Aborted
+	elif (( $CREATE_BUG_REPORT == 0 )); then
+
+		/DietPi/dietpi/dietpi-banner 1
+		echo -e "\nBug report aborted by user.\n"
+
+	fi
+
+	#----------------------------------------------------------------
+	#remove temp folder and all generated temp files
+	cd "$HOME"
+	rm -R "$FILEPATH_TEMP" &> /dev/null
+
+	#-----------------------------------------------------------------------------------
+	exit 0
+	#-----------------------------------------------------------------------------------
+
+}

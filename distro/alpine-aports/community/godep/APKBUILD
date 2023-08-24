@@ -1,0 +1,30 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer:
+pkgname=godep
+pkgver=79
+pkgrel=0
+pkgdesc="Dependency tool for go"
+url="http://github.com/tools/godep"
+arch="all"
+license="BSD"
+makedepends="go"
+source="$pkgname-$pkgver.tar.gz::https://github.com/tools/$pkgname/archive/v$pkgver.tar.gz"
+builddir="$srcdir/src/github.com/tools/$pkgname"
+
+prepare() {
+	mkdir -p "${builddir%/*}"
+	mv "$srcdir"/$pkgname-$pkgver "$builddir" || return 1
+
+	default_prepare
+}
+
+build() {
+	cd "$builddir"
+	GOPATH="$srcdir" go build
+}
+
+package() {
+	install -D -m 755 "$builddir"/$pkgname "$pkgdir"/usr/bin/godep
+}
+
+sha512sums="322c9fa419a56e10b3b974276384f1f2909ee0d6961124c8d047bd9f3f94f31fcf4c00b07145f1fff2ba78bfeda6886b78a728b29fb01a20cd1b83f81abd6f04  godep-79.tar.gz"

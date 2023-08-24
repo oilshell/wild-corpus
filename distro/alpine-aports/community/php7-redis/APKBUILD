@@ -1,0 +1,37 @@
+# Contributor: Fabio Ribeiro <fabiorphp@gmail.com>
+# Maintainer: Fabio Ribeiro <fabiorphp@gmail.com>
+pkgname=php7-redis
+_pkgreal=redis
+pkgver=3.1.4
+pkgrel=0
+_phpver=${pkgname#php}
+_phpver=${_phpver%%-*}
+pkgdesc="PHP$_phpver extension for interfacing with Redis"
+url="https://pecl.php.net/package/redis"
+arch="all"
+license="PHP"
+depends="php$_phpver-common php$_phpver-session"
+makedepends="php$_phpver-dev autoconf"
+source="$pkgname-$pkgver.tgz::http://pecl.php.net/get/$_pkgreal-$pkgver.tgz"
+options="!check"
+builddir="$srcdir/$_pkgreal-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	phpize$_phpver
+	./configure --prefix=/usr --with-php-config=php-config$_phpver
+	make
+}
+
+package() {
+	local confdir="$pkgdir/etc/php$_phpver/conf.d"
+	cd "$builddir"
+
+	make INSTALL_ROOT="$pkgdir" install
+
+	mkdir -p "$confdir"
+	echo "extension=$_pkgreal.so" > "$confdir"/20_$_pkgreal.ini
+}
+
+sha512sums="dbf3eecfa761d0d3e97781968378d8bcc74e79bf4a0f85d6c2e8338180755e503179bc78b03ae6ee26a5619f439ead77068db3ab18d1b2dbf58e1643bea3a49f  php7-redis-3.1.4.tgz"

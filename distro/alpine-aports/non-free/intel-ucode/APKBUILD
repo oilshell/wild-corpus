@@ -1,0 +1,34 @@
+# Maintainer: Marian Buschsieweke <marian.buschsieweke@ovgu.de>
+pkgname=intel-ucode
+pkgver=20170511
+pkgrel=0
+pkgdesc="Microcode update files for Intel CPUs"
+arch=noarch
+url="http://downloadcenter.intel.com/SearchResult.aspx?lang=eng&keyword=%22microcode%22"
+license='custom'
+source="http://downloadmirror.intel.com/26798/eng/microcode-${pkgver}.tgz
+        LICENSE
+        intel-microcode2ucode.c"
+options="!check"
+
+build() {
+  cd "$srcdir"
+  gcc -Wall ${CFLAGS} -o intel-microcode2ucode intel-microcode2ucode.c
+  ./intel-microcode2ucode ./microcode.dat
+}
+
+package() {
+  cd "$srcdir"
+  
+  install -d -m755 "${pkgdir}"/boot
+
+  mkdir -p kernel/x86/microcode
+  mv microcode.bin kernel/x86/microcode/GenuineIntel.bin
+  echo kernel/x86/microcode/GenuineIntel.bin | cpio -o -H newc -R 0:0 > "${pkgdir}"/boot/intel-ucode.img
+  
+  install -D -m644 LICENSE \
+    "${pkgdir}"/usr/share/licenses/${pkgname}/LICENSE || return 1
+}
+sha512sums="4e2066096d56430c2df73631f15cf16f2317c1d8ff745d7b7cdd784ebccc2b797565eb52703cce9b4238774dbfdcaecacd892d729b7869fdfd7644008ce74a60  microcode-20170511.tgz
+d80ce9087e2ffd0168600a34de195d6514d3a496bc233294cd838498e1ce668b9ad4463bbbe7958feec0421b5aed3ade1633432ce086241e03ed06bbd53b83a5  LICENSE
+ee60f968acab4067f5660449eabae533b5d3996cd59fd4b69d0e23e0b264da216ab6e6ccd554222cf355fc14dbd348562a2d36a87a60f1f54433603e04998cd1  intel-microcode2ucode.c"

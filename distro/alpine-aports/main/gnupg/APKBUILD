@@ -1,0 +1,52 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=gnupg
+pkgver=2.2.0
+_ver=${pkgver/_beta/-beta}
+pkgrel=1
+pkgdesc="GNU Privacy Guard 2 - a PGP replacement tool"
+url="https://www.gnupg.org/"
+arch="all"
+license="GPL"
+options=""
+depends="pinentry"
+makedepends="gnutls-dev libksba-dev libgcrypt-dev libgpg-error-dev
+	npth-dev zlib-dev libassuan-dev openldap-dev bzip2-dev"
+subpackages="$pkgname-doc"
+source="https://gnupg.org/ftp/gcrypt/$pkgname/$pkgname-$_ver.tar.bz2
+	0001-Include-sys-select.h-for-FD_SETSIZE.patch
+	fix-i18n.patch"
+builddir="$srcdir"/$pkgname-$_ver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--disable-nls \
+		--enable-bzip2
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+
+	# install compat symlink
+	ln -s gpg  "$pkgdir"/usr/bin/gpg2
+	ln -s gpgv "$pkgdir"/usr/bin/gpgv2
+}
+
+sha512sums="8ab7c4183d2ec2e6b62066e3cbcba95babaa0ae22da47feab716698792d26495f072d50e8ec612b8d26147636bb316320c78940184373b3f4cb6ec411933361b  gnupg-2.2.0.tar.bz2
+c6cc4595081c5b025913fa3ebecf0dff87a84f3c669e3fef106e4fa040f1d4314ee52dd4c0e0002b213034fb0810221cfdd0033eae5349b6e3978f05d08bcac7  0001-Include-sys-select.h-for-FD_SETSIZE.patch
+b19a44dacf061dd02b439ab8bd820e3c721aab77168f705f5ce65661f26527b03ea88eec16d78486a633c474120589ec8736692ebff57ab9b95f52f57190ba6b  fix-i18n.patch"

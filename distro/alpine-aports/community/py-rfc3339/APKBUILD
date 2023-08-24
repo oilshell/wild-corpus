@@ -1,0 +1,51 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer:
+pkgname=py-rfc3339
+_pkgname=pyRFC3339
+pkgver=1.0
+pkgrel=1
+pkgdesc="Generate and parse RFC 3339 timestamps"
+url="https://pypi.python.org/pypi/pyRFC3339"
+arch="noarch"
+license="MIT"
+depends="py-tz"
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	depends="${depends//py-/py2-}"
+	_py python2
+}
+
+_py3() {
+	depends="${depends//py-/py3-}"
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+md5sums="0f7edd7ffd756a582eeef9282fecb60d  pyRFC3339-1.0.tar.gz"
+sha256sums="8dfbc6c458b8daba1c0f3620a8c78008b323a268b27b7359e92a4ae41325f535  pyRFC3339-1.0.tar.gz"
+sha512sums="abcfcfcf516ab60214dc11de618d37415da2177387f51f85da99ef18b8cc0d37ed55f0ea6ba3e61292ce5a319838f322e01c1c9f3c0c4edb8341b4b135e575e3  pyRFC3339-1.0.tar.gz"

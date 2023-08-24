@@ -1,0 +1,40 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Contributor: William Pitcock <nenolod@dereferenced.org>
+# Maintainer: William Pitcock <nenolod@dereferenced.org>
+pkgname=audacious
+pkgver=3.9
+pkgrel=0
+pkgdesc="A playlist-oriented media player with multiple interfaces"
+url="http://audacious-media-player.org/"
+arch="all"
+license="ISC"
+depends_dev="gtk+2.0-dev dbus-glib-dev"
+makedepends="$depends_dev libguess-dev>=1.2 libxml2-dev autoconf automake"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang $pkgname-dbg"
+source="http://distfiles.audacious-media-player.org/$pkgname-$pkgver.tar.bz2"
+builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	default_prepare
+	msg "Rebuilding configure..."
+	aclocal -I m4 && autoheader && autoconf
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--enable-chardet
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="d8ef24c91c84bfa80831075cd9a12fc4bf02cec8bc96bcfa5a941254d194cccdc482482b1c015bc63e1142718c2221034c0f3a87e2cb6e4daf3b4cc428328aaa  audacious-3.9.tar.bz2"

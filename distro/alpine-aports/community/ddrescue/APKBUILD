@@ -1,0 +1,37 @@
+# Maintainer: Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=ddrescue
+pkgver=1.22
+pkgrel=0
+pkgdesc="Data recovery tool for block devices with errors"
+url="http://www.gnu.org/s/ddrescue/ddrescue.html"
+arch="all !aarch64"
+license="GPL3+"
+subpackages="$pkgname-doc"
+source="http://ftp.heanet.ie/mirrors/gnu/$pkgname/$pkgname-$pkgver.tar.lz"
+builddir="$srcdir/$pkgname-$pkgver"
+build() {
+	cd "$builddir"
+
+	./configure --prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info
+	make
+}
+
+check() {
+	cd "$builddir"
+
+	# XXX: Some tests fail on s390x, but only on builder, so ignore it for now.
+	case "$CARCH" in
+		s390x) make check || true;;
+		*) make check;;
+	esac
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="3e5236374e2c1baae40026f59cf7040414d798a48d4edd6c6bde919e658ca958a795421301439ab2b8aa9f1d8fc60a2fff84b26e22a350e4150850b9830ce754  ddrescue-1.22.tar.lz"

@@ -1,0 +1,56 @@
+# Contributor: ScrumpyJack <scrumpyjack@st.ilet.to>
+# Maintainer: ScrumpyJack <scrumpyjack@st.ilet.to>
+pkgname=gammu
+pkgver=1.38.1
+pkgrel=0
+pkgdesc="Gammu provides an abstraction layer for cell phones access"
+url="http://wammu.eu/"
+arch="all"
+license="GPLv2+"
+depends="dialog bluez"
+depends_dev=""
+makedepends="$depends_dev unixodbc-dev libdbi-dev postgresql-dev
+	bluez-dev mysql-dev libusb-dev curl-dev cmake doxygen linux-headers"
+install=""
+subpackages="$pkgname-smsd:_smsd $pkgname-doc $pkgname-dev $pkgname-libs"
+source="http://sourceforge.net/projects/${pkgname}/files/${pkgname}/${pkgver}/${pkgname}-${pkgver}.tar.bz2"
+
+_builddir="${srcdir}/${pkgname}-${pkgver}"
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	cmake . -DBUILD_SHARED_LIBS=ON \
+		-DCMAKE_INSTALL_PREFIX="/usr" \
+		-DWITH_NOKIA_SUPPORT=ON \
+		-DWITH_Bluez=ON \
+		-DWITH_IrDA=On \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+_smsd() {
+	cd "$_builddir"
+	pkgdesc="Gammu SMS daemon"
+	mkdir -p "$subpkgdir"/usr/bin/ || return 1
+	mv "$pkgdir"/usr/bin/gammu-smsd \
+	   "$pkgdir"/usr/bin/gammu-smsd-monitor \
+	   "$pkgdir"/usr/bin/gammu-smsd-inject "$subpkgdir"/usr/bin
+}
+
+md5sums="72cbf9035509978e24e5ddf2a3b46b9e  gammu-1.38.1.tar.bz2"
+sha256sums="830ad11f88318c9a08645ac41d328e5c0e5ecd4b02c972343c0ec32d772ff1c2  gammu-1.38.1.tar.bz2"
+sha512sums="c13df82b5b018cc42a7fe7a2c29e6332534426e7c5765d2f97dfa79096ee9b37bbfc87da0b5c403ce1d9877d176da90ccbde5f643a5fa11e824aa683a050c6b0  gammu-1.38.1.tar.bz2"

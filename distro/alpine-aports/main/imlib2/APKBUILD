@@ -1,0 +1,36 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=imlib2
+pkgver=1.4.10
+pkgrel=0
+pkgdesc="Library that does image file loading and saving as well as rendering, manipulation, arbitrary polygon support"
+url="http://sourceforge.net/projects/enlightenment/"
+arch="all"
+license="BSD"
+subpackages="$pkgname-dev $pkgname-doc"
+depends=""
+depends_dev="freetype-dev libxext-dev libsm-dev"
+makedepends="$depends_dev tiff-dev giflib-dev bzip2-dev
+	libpng-dev libid3tag-dev libjpeg-turbo-dev zlib-dev util-linux-dev"
+source="http://downloads.sourceforge.net/enlightenment/$pkgname-$pkgver.tar.bz2"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc/imlib2 \
+		--x-libraries=/usr/lib \
+		--disable-mmx \
+		--disable-amd64
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR=$pkgdir install
+	install -Dm644 COPYING $pkgdir/usr/share/licenses/$pkgname/COPYING
+}
+
+sha512sums="5bad7d2100b1706a3f7eed5fedd12afdb643c647823472b515dac3753ff5293d0fae08be7f06ad16e63968e548c9e82ab5e6d7a938e5359903f57be24cd2a07b  imlib2-1.4.10.tar.bz2"

@@ -1,0 +1,28 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=beets
+pkgver=1.4.5
+pkgrel=1
+pkgdesc="music library manager and MusicBrainz tagger"
+url="http://beets.io"
+arch="noarch"
+license="MIT"
+depends="python2 py-mutagen py-unidecode py-musicbrainzngs py-munkres
+	py-setuptools py-enum34 py-yaml py-jellyfish"
+makedepends="python2-dev py-setuptools"
+source="https://github.com/sampsyo/beets/releases/download/v$pkgver/beets-$pkgver.tar.gz"
+
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+}
+
+package() {
+	cd "$builddir"
+	python2 setup.py install --prefix=/usr --root="$pkgdir"
+}
+
+sha512sums="b1ec96bf90e9e11be70085af87fe124ca52bf939ea5334379eb8f42b948cb2f534afc804428e3b928439e92fbd46e6fc1a00a71b16f9f35646ef6e94a6f9148c  beets-1.4.5.tar.gz"

@@ -1,0 +1,21 @@
+# Maintainer: Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=postfix-policyd-spf-perl
+pkgver=2.007
+pkgrel=2
+pkgdesc="A Sender Policy Framework implementation"
+url="http://www.openspf.org/Software"
+arch="all"
+license="GPL"
+depends="perl perl-mail-spf perl-netaddr-ip"
+makedepends=""
+install=
+subpackages=""
+source="http://www.openspf.org/blobs/$pkgname-$pkgver.tar.gz"
+
+build() {
+	cd "$srcdir/$pkgname-$pkgver"
+
+	install -m755 -D "$srcdir"/$pkgname-$pkgver/$pkgname "$pkgdir"/usr/bin/$pkgname
+}
+
+sha512sums="4b527a5c77415b77c6efa1d656ed40875689e35207ca10b76b305e0833b5d20f6682954f90fc610e8da74411f8ffc6d23a8be1b2d1ff73b5525f80ef1a98379f  postfix-policyd-spf-perl-2.007.tar.gz"

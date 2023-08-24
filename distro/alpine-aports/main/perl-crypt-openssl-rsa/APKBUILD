@@ -1,0 +1,37 @@
+# Contributor: Leonardo Arena <rnalrd@alpinelinux.org>
+# Maintainer:  Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=perl-crypt-openssl-rsa
+_realname=Crypt-OpenSSL-RSA
+pkgver=0.28
+pkgrel=8
+pkgdesc="RSA encoding and decoding, using the openSSL libraries"
+url="http://search.cpan.org/~perler/"
+arch="all"
+license="Perl Artistic, GPL"
+depends="perl perl-crypt-openssl-random"
+makedepends="perl-dev libressl-dev"
+install=
+subpackages="$pkgname-doc"
+source="http://search.cpan.org/CPAN/authors/id/P/PE/PERLER/$_realname-$pkgver.tar.gz"
+
+_builddir="$srcdir"/$_realname-$pkgver
+
+prepare() {
+	cd $_builddir
+	return 0
+}
+
+build() {
+	cd $_builddir
+	PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor || return 1
+	make || return 1
+}
+
+package() {
+	cd $_builddir
+	make DESTDIR="$pkgdir" install
+	# creates file collision among perl modules
+	find "$pkgdir" -name perllocal.pod -delete
+}
+
+sha512sums="4a20c3f814e80ea15304b2a189001172e72237d703a0f9281e7e46d593c521508abfac3a259701994ec867f160821bec37e4e8234d04b792168db19b065ce324  Crypt-OpenSSL-RSA-0.28.tar.gz"

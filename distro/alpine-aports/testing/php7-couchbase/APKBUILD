@@ -1,0 +1,37 @@
+# Contributor: Nathan Johnson <nathan@nathanjohnson.info>
+# Maintainer: Nathan Johnson <nathan@nathanjohnson.info>
+pkgname=php7-couchbase
+_pkgreal=couchbase
+pkgver=2.4.0
+pkgrel=0
+_phpver=${pkgname#php}
+_phpver=${_phpver%%-*}
+pkgdesc="PHP$_phpver extension for Couchbase"
+url="http://pecl.php.net/package/couchbase"
+arch="all"
+license="ASL-2.0"
+depends="php$_phpver-common php$_phpver-json"
+makedepends="php$_phpver-dev autoconf libcouchbase-dev zlib-dev"
+source="$pkgname-$pkgver.tgz::http://pecl.php.net/get/$_pkgreal-$pkgver.tgz"
+options="!check"
+builddir="$srcdir/$_pkgreal-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	phpize$_phpver
+	./configure --prefix=/usr --with-php-config=php-config$_phpver
+	make
+}
+
+package() {
+	local confdir="$pkgdir/etc/php$_phpver/conf.d"
+	cd "$builddir"
+
+	make INSTALL_ROOT="$pkgdir" install
+
+	mkdir -p "$confdir"
+	echo "extension=$_pkgreal.so" > "$confdir"/$_pkgreal.ini
+}
+
+sha512sums="8247dc8b1e6692e60be7e1cb52314b86f86a35a73594b1932104db105f6a0618a340e1871c444c5d1f42560ebd8ae87842741608b671b050a3f44c3262559e13  php7-couchbase-2.4.0.tgz"

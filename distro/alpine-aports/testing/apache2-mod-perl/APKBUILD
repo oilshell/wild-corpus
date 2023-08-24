@@ -1,0 +1,53 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Contributor: Matt Smith <mcs@darkregion.net>
+# Maintainer: Matt Smith <mcs@darkregion.net>
+pkgname=apache2-mod-perl
+_pkgreal=mod_perl
+pkgver=2.0.10
+pkgrel=0
+pkgdesc="Perl Module for Apache2"
+url="http://perl.apache.org/"
+arch="all"
+license="ASL 2.0"
+depends="apache2"
+depends_dev="$pkgname"
+makedepends="apache2-dev perl-dev perl-linux-pid apr-dev apr-util-dev"
+install=""
+subpackages="$pkgname-doc $pkgname-dev"
+source="http://www-eu.apache.org/dist/perl/$_pkgreal-$pkgver.tar.gz
+	$pkgname.conf"
+builddir="$srcdir/$_pkgreal-$pkgver"
+
+build() {
+	cd "$builddir"
+	perl Makefile.PL \
+		INSTALLDIRS=vendor \
+		MP_APXS=/usr/bin/apxs || return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	find "$pkgdir" \( -name perllocal.pod -o -name .packlist \) -delete
+	install -Dm644 "$srcdir"/$pkgname.conf \
+		"$pkgdir"/etc/apache2/conf.d/$_pkgreal.conf
+}
+
+dev() {
+	default_dev || return 1
+
+	mv "$pkgdir"/usr/bin "$subpkgdir"/usr || return 1
+
+	mkdir -p "$subpkgdir"/usr/lib/perl5/vendor_perl/auto/Apache2 || return 1
+	mv "$pkgdir"/usr/lib/perl5/vendor_perl/auto/Apache2/Build \
+		"$pkgdir"/usr/lib/perl5/vendor_perl/auto/Apache2/typemap \
+		"$subpkgdir"/usr/lib/perl5/vendor_perl/auto/Apache2 ||return 1
+}
+
+md5sums="cef55e715b5770a63b3becbe9d271121  mod_perl-2.0.10.tar.gz
+326cad2b2324c4a59fde4c232e8465b1  apache2-mod-perl.conf"
+sha256sums="d1cf83ed4ea3a9dfceaa6d9662ff645177090749881093051020bf42f9872b64  mod_perl-2.0.10.tar.gz
+02b359afff4da0c4a94cc2c253505f301f8b4fca5a14655fdd846f07cbd33530  apache2-mod-perl.conf"
+sha512sums="0bf1a885cb32a3393e95f87e71983097613e263b9052dbf22494663b506e36a25d0256afed24285232276d9f43ebd3adaa18b91129bfb62116a8ccb023855bca  mod_perl-2.0.10.tar.gz
+15a430ce597e370997a08d6aa1b5e55d4fa723ecac031fe39906c8cc767b90d5bf63e3026dfaa8b10ae8b09a17832f4f07cb8b2fdcd6c9ef427edfaf4e8a48b0  apache2-mod-perl.conf"

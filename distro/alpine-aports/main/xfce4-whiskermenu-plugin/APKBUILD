@@ -1,0 +1,43 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=xfce4-whiskermenu-plugin
+pkgver=1.7.2
+pkgrel=0
+pkgdesc="alternate application launcher for Xfce"
+url="http://gottcode.org/xfce4-whiskermenu-plugin/"
+arch="all"
+license="GPL2"
+depends=""
+depends_dev=""
+makedepends="$depends_dev cmake libxfce4ui-dev libxfce4util-dev exo-dev
+	garcon-dev xfce4-panel-dev"
+install=""
+subpackages="$pkgname-doc $pkgname-lang"
+source="http://mirror.netcologne.de/xfce/src/panel-plugins/xfce4-whiskermenu-plugin/${pkgver%.*}/xfce4-whiskermenu-plugin-$pkgver.tar.bz2"
+
+_builddir="$srcdir"/xfce4-whiskermenu-plugin-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	cmake \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_BUILD_TYPE=Release \
+		. || return 1
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make install LIBDIR=lib DESTDIR="$pkgdir" || return 1
+}
+
+sha512sums="fb726d145e5ac8830c236d5a4e82373b9262bb8c0e65893456ed072c26bb823e4464bd12c1445bb5333be4bb63b0c166733dcb3099bcbc473863f980e29a7c37  xfce4-whiskermenu-plugin-1.7.2.tar.bz2"

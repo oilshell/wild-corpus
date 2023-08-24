@@ -1,0 +1,89 @@
+# Contributor: Francesco Colista <fcolista@alpinelinux.org>
+# Contributor: Dennis Przytarski <dennis@przytarski.com>
+# Contributor: Francesco Zanini <francesco@zanini.me>
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=knot
+pkgver=2.5.4
+pkgrel=0
+pkgdesc="An high-performance authoritative-only DNS server"
+url="https://www.knot-dns.cz"
+arch="all"
+license="GPL3"
+depends=""
+makedepends="gnutls-dev libedit-dev libcap-ng-dev libidn-dev lmdb-dev
+	libressl-dev userspace-rcu-dev zlib-dev
+	m4 bison flex perl jansson-dev libtool"
+install="$pkgname.pre-install $pkgname.post-install knot.post-upgrade"
+pkgusers="knot"
+pkggroups="knot"
+options="!check"
+subpackages="$pkgname-libs
+	$pkgname-utils
+	$pkgname-dev
+	$pkgname-doc
+	"
+source="https://secure.nic.cz/files/knot-dns/$pkgname-$pkgver.tar.xz
+	knotd.confd
+	knotd.initd
+	"
+builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	default_prepare
+
+	cd "$builddir"
+	# Make sure embedded LMDB library is not used.
+	rm -rf src/contrib/lmdb
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--libexecdir=/usr/lib/knot \
+		--with-rundir=/run/knot \
+		--with-storage=/var/lib/knot \
+		--disable-silent-rules
+	make
+}
+
+package() {
+	cd "$builddir"
+
+	make DESTDIR="$pkgdir" install
+
+	rm -Rf "$pkgdir"/run
+	chown $pkgusers:$pkggroups "$pkgdir"/var/lib/$pkgname
+	chmod 750 "$pkgdir"/var/lib/$pkgname
+
+	install -Dm 644 "$srcdir"/knotd.confd \
+		"$pkgdir"/etc/conf.d/knotd
+	install -Dm 755 "$srcdir"/knotd.initd \
+		"$pkgdir"/etc/init.d/knotd
+}
+
+libs() {
+	pkgdesc="Libraries used by the Knot DNS server and client applications"
+
+	cd "$pkgdir"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv ./usr/lib/libdnssec.so.* \
+		./usr/lib/libknot.so.* \
+		./usr/lib/libzscanner.so.* \
+		"$subpkgdir"/usr/lib/
+}
+
+utils() {
+	pkgdesc="DNS client utilities shipped with the Knot DNS server"
+
+	mkdir -p "$subpkgdir"/usr
+	mv "$pkgdir"/usr/bin "$subpkgdir"/usr/
+}
+
+sha512sums="8b41a1ef0f9633815c38267130eba8c30c8c543ad6d74e0f63db42975d419938aa9cf4a921a7af966944fbd582f0e1364c6a05c79bc01a19674ed7ce0e66ef30  knot-2.5.4.tar.xz
+471d3c639a8235ba09491c99d36c0a4f1074d6055ccfd3807be02a30d3ed5bbe69a84f0414ea7810db6bbc1e38f5837108e5744fc59f949ed78a262a7de4597e  knotd.confd
+979f06a83dd4326920a682f8190319577faf904e0e379b3c55e0420eb43dcb55d86c6727015634fa0c2dff1dddac43bbd5a216ff04f217ad91d670eb899dbefa  knotd.initd"

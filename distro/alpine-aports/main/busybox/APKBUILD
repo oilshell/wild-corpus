@@ -1,0 +1,193 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Contributor: Oliver Smith <ollieparanoid@bitmessage.ch>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=busybox
+pkgver=1.27.1
+pkgrel=0
+pkgdesc="Size optimized toolbox of many common UNIX utilities"
+url=http://busybox.net
+arch="all"
+license="GPL2"
+makedepends_build=""
+makedepends_host="linux-headers"
+makedepends="$makedepends_build $makedepends_host"
+checkdepends="zip"
+provides="/bin/sh"
+install="$pkgname.post-install $pkgname.post-upgrade
+	$pkgname-extras.post-install $pkgname-extras.pre-deinstall"
+subpackages="$pkgname-static $pkgname-suid $pkgname-extras"
+options="suid !check"
+triggers="busybox.trigger=/bin:/usr/bin:/sbin:/usr/sbin:/lib/modules/*"
+source="http://busybox.net/downloads/$pkgname-$pkgver.tar.bz2
+	0001-ash-exec-busybox.static.patch
+	0002-app-location-for-cpio-vi-and-lspci.patch
+	0003-udhcpc-set-default-discover-retries-to-5.patch
+	0004-ping-make-ping-work-without-root-privileges.patch
+	0005-fbsplash-support-console-switching.patch
+	0006-fbsplash-support-image-and-bar-alignment-and-positio.patch
+	0007-depmod-support-generating-kmod-binary-index-files.patch
+	0008-diff-add-support-for-no-dereference.patch
+	0009-sysklogd-add-Z-option-to-adjust-message-timezones.patch
+	0010-udhcpc-Don-t-background-if-n-is-given.patch
+	0011-testsuite-fix-cpio-tests.patch
+	0001-unzip-fix-regression-on-big-endian-machines.patch
+	0012-microcom-segfault.patch
+
+	top-buffer-overflow.patch
+
+	acpid.logrotate
+	busyboxconfig
+	busyboxconfig-extras
+	bbsuid.c
+	dad.if-up
+	nologin.c
+	"
+builddir="$srcdir"/$pkgname-$pkgver
+
+_staticdir="$srcdir"/build-static
+_dyndir="$srcdir"/build-dynamic
+_dyndir_extras="$srcdir"/build-dynamic-extras
+_config="$srcdir"/busyboxconfig
+_config_extras="$srcdir"/busyboxconfig-extras
+
+prepare() {
+	default_prepare
+
+	cd "$builddir"
+	mkdir -p "$_staticdir" "$_dyndir" "$_dyndir_extras"
+	cp "$srcdir"/nologin.c loginutils/
+}
+
+build() {
+	# build bbsuid
+	msg "Building bbsuid"
+	${CC:-${CROSS_COMPILE}gcc} ${CPPFLAGS} ${CFLAGS} \
+		${LDFLAGS} "$srcdir"/bbsuid.c -o "$_dyndir"/bbsuid
+
+	# build dynamic
+	cd "$_dyndir"
+	msg "Building dynamic busybox"
+	cp "$_config" .config
+	[ "$CLIBC" = musl ] && sed -i \
+		-e "s/CONFIG_EXTRA_COMPAT=y/CONFIG_EXTRA_COMPAT=n/" \
+		.config
+	make -C "$builddir" O="$PWD" silentoldconfig
+	make
+
+	# build dynamic (extras)
+	cd "$_dyndir_extras"
+	msg "Building dynamic busybox-extras"
+	cp "$_config_extras" .config
+	[ "$CLIBC" = musl ] && sed -i \
+		-e "s/CONFIG_EXTRA_COMPAT=y/CONFIG_EXTRA_COMPAT=n/" \
+		.config
+	make -C "$builddir" O="$PWD" silentoldconfig
+	make
+
+	# build static
+	cd "$_staticdir"
+	msg "Building static busybox"
+	sed -e "s/.*CONFIG_PIE.*/\# CONFIG_PIE is not set/" \
+		-e "s/.*CONFIG_STATIC.*/CONFIG_STATIC=y/" \
+		"$_config" > .config
+	# musl does not support GNU regex
+	[ "$CLIBC" = musl ] && sed -i \
+		-e "s/CONFIG_EXTRA_COMPAT=y/CONFIG_EXTRA_COMPAT=n/" \
+		.config
+	make -C "$builddir" O="$PWD" silentoldconfig
+	make
+	mv busybox busybox.static
+}
+
+check() {
+	cd "$_dyndir"
+	SKIP_KNOWN_BUGS=1 make -C "$builddir" O="$PWD" V=1 check
+
+	cd "$_dyndir_extras"
+	SKIP_KNOWN_BUGS=1 make -C "$builddir" O="$PWD" V=1 check
+}
+
+package() {
+	cd "$_dyndir"
+	mkdir -p "$pkgdir"/usr/sbin "$pkgdir"/usr/bin "$pkgdir"/tmp \
+		"$pkgdir"/var/cache/misc "$pkgdir"/bin "$pkgdir"/sbin
+	chmod 1777 "$pkgdir"/tmp
+	install -m755 busybox "$pkgdir"/bin/busybox || return 1
+	# we need /bin/sh to be able to execute post-install
+	ln -s /bin/busybox "$pkgdir"/bin/sh
+
+	#ifupdown needs those dirs to be present
+	mkdir -p \
+		"$pkgdir"/etc/network/if-down.d \
+		"$pkgdir"/etc/network/if-post-down.d \
+		"$pkgdir"/etc/network/if-post-up.d \
+		"$pkgdir"/etc/network/if-pre-down.d \
+		"$pkgdir"/etc/network/if-pre-up.d \
+		"$pkgdir"/etc/network/if-up.d
+	install -m775 "$srcdir"/dad.if-up "$pkgdir"/etc/network/if-up.d/dad
+
+	install -Dm644 "$srcdir"/acpid.logrotate \
+		"$pkgdir/etc/logrotate.d/acpid"
+
+	mkdir -p "$pkgdir"/var/lib/udhcpd
+	install -Dm644 "$builddir"/examples/udhcp/udhcpd.conf \
+		"$pkgdir"/etc/udhcpd.conf
+	cat >"$pkgdir"/etc/securetty <<EOF
+console
+tty1
+tty2
+tty3
+tty4
+tty5
+tty6
+tty7
+tty8
+tty9
+tty10
+tty11
+EOF
+}
+
+extras() {
+	pkgdesc="Additional binaries of Busybox"
+	depends="${pkgname}"
+	install -Dm755 "$_dyndir_extras"/busybox "$subpkgdir"/bin/busybox-extras
+}
+
+suid() {
+	pkgdesc="suid binaries of Busybox"
+	depends="${pkgname}"
+
+	cd "$_dyndir"
+	mkdir -p "$subpkgdir"/bin
+	install -m4111 bbsuid "$subpkgdir"/bin/bbsuid
+}
+
+static() {
+	pkgdesc="Statically linked Busybox"
+	mkdir -p "$subpkgdir"/bin
+	install -m755 "$_staticdir"/busybox.static \
+		"$subpkgdir"/bin/busybox.static
+}
+
+sha512sums="f5ae32bc2dff535bb6ad17dc3a56f576e9078cd574a8fcff58ba601c36e668f26b66db8b361201441b72215bda79750a03353b0fff7bddb472d8e9a8b855236f  busybox-1.27.1.tar.bz2
+1930775839354a63c30970f0d52d00cfd3a8f6b9f48d6de45ea7d2478d080bde7193c1c2cce026dc7337d9ecf0b65f5ff1dd4351c1eb195e6f0c0c5126f10511  0001-ash-exec-busybox.static.patch
+a756aa89c4602cd091df0052e2e3d7b45a359fbfe953b70aa3029e3eeb8e5d1772cbf1525bb62df6ce6547f1e5605617195ddae336e1ffe41f5c58d524af6ba6  0002-app-location-for-cpio-vi-and-lspci.patch
+fc17ce9b12726e3449518692bf0d4906c36f091534706b5b91c910866bd8cd50d8f7d4b449d54eeed24ee656012a6ef04612bf092874e4b83b0723f852fdce0e  0003-udhcpc-set-default-discover-retries-to-5.patch
+dc0b660b60ef3028a4cc86f712e7f6d08ad7c00d27056f9978a2a103434f45edc7385d2c48eca5ee83efab8fc81735674bf1c40e78fb07a1b5d07ca9da37811a  0004-ping-make-ping-work-without-root-privileges.patch
+63838512679586eb6d83e7b7d3b1e318bb693b91dfb9675a48480e6623e03472b1aa7f86fb7e2ab9e8d6db7a9609b2bcf1c3c1de64fc7d73b65b4794cab87cbf  0005-fbsplash-support-console-switching.patch
+1afe261da507ca13869923033a4adbb3c22e512136cc4b771a2d14d0c25d8de6514cec1dd0363b0684410f0e6a274c3250c1ca8a8a839111f3ed16f800b1d403  0006-fbsplash-support-image-and-bar-alignment-and-positio.patch
+16804d38000bf4395ed2657c19ddf0a1414214db8d2e43541034d5a6db29f74c53c6d8fd28c4c865c7e87fa4a9b914d414e5a00430a261aeaa69ec86bf865780  0007-depmod-support-generating-kmod-binary-index-files.patch
+baac796f8aa96fbeab19f96eea7787ace5737b182f49e02f1b1e911d0a927ae14f3c334daad4241858617dc79607541b9ce66b367d0379b2cb32f67a1e9efc5b  0008-diff-add-support-for-no-dereference.patch
+d1c375184f806f7550bac5c82ab5471bdb8085d845172c973724b22af05ab3759b3ce982e088b4c45815ade56b9adfb7a677d0c180e077545ac7ec003c8aa7c4  0009-sysklogd-add-Z-option-to-adjust-message-timezones.patch
+9b5143d0be615b1604d82007628d59a62721f1e61a63cca7a4ffa5e60fa8da102bfc21fa20cc35c2f5a0a24bc8013598f8eff5888f9d0f3bcfa796343b5f5a91  0010-udhcpc-Don-t-background-if-n-is-given.patch
+f4e00eb13fda752df13f300a7ed9b1320ca9f573c4309247f292c8710464d7be8740148f42e4aff16312335eadabce5a629dce4af58334b9199faf2fd658e4f9  0011-testsuite-fix-cpio-tests.patch
+daa6732a95a52a194d2031f2d5af5f658b9da3e8669fc2206000faaab7da56966a62646eed615fd1cbc5f07d42c03bf19ff183ef6f933b7daaeef1d388e21874  0001-unzip-fix-regression-on-big-endian-machines.patch
+a09a64b3bce8048c58a68dcd2dd9e63c911009c06195d6bb4e5aecfb5700e479c25b34635c60899127975fae32275ad51846ee75f840d612e00668ce9aba8322  0012-microcom-segfault.patch
+524e858b52cb31fb8d24e8c7f18606fff349aeab6a14da9cca3902641f6127980daed73c53586c6e8b41eecda06cdb29c40ff1dde2dc82a318c2649680458921  top-buffer-overflow.patch
+a9b1403c844c51934637215307dd9e2adb9458921047acff0d86dcf229b6e0027f4b2c6cdaa25a58407aad9d098fb5685d58eb5ff8d2aa3de4912cdea21fe54c  acpid.logrotate
+857dece10267a065e0e8c16dd6190656f890a5aff774e96321715673dda23e75a8e61148e81d6286b7bdfe737a0b99104f9b04deeb4f392c72b63d8e3d00e556  busyboxconfig
+341cd3e82a9152743aaf0e1a2969bef11b914aa0ee0ed584e74cd72bbb409e6b15207857046743822179909a0760f00c37f5618a660670e1a0e56f82abc9f470  busyboxconfig-extras
+e84087a453f8c9814951c9ad496cce19f8280b80a8ab6a1c8e21385f1facb17e987adc8d1d72c7cb463c04eb0cadd2bd6fb9b6f6c0067ddd21eeacf91ca42f32  bbsuid.c
+a1127c8a384294135e11500fde7ead33b73d24b11c21911b08447a4c4ef71d7a9965d6466f60f2da64e3b877213b0a3e924a5add3c5333ee3ecde8c2a91c5e02  dad.if-up
+4e7c291a70e879b74c0fc07c54a73ef50537d8be68fee6b2d409425c07afd2d67f9b6afcd8c33a7971014913cc5de85e45079681c9e77200c6cc2f34acfba6d2  nologin.c"

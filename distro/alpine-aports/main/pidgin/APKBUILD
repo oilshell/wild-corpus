@@ -1,0 +1,95 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=pidgin
+pkgver=2.12.0
+pkgrel=2
+pkgdesc="graphical multi-protocol instant messaging client for X"
+url="http://pidgin.im/"
+arch="all"
+license="GPL"
+depends=
+makedepends="gtk+-dev intltool libsm-dev startup-notification-dev gtkspell-dev
+	libxml2-dev libidn-dev gnutls-dev avahi-dev
+	cyrus-sasl-dev ncurses-dev nss-dev
+	"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang
+	libpurple-bonjour:_bonjour
+	libpurple-oscar:_oscar
+	libpurple-xmpp:_xmpp
+	finch libpurple
+	"
+source="https://bitbucket.org/pidgin/main/downloads/$pkgname-$pkgver.tar.bz2"
+options="!check"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--enable-avahi \
+		--disable-dbus \
+		--disable-doxygen \
+		--disable-gnutls \
+		--disable-meanwhile \
+		--disable-nm \
+		--disable-perl \
+		--disable-schemas-install \
+		--disable-screensaver \
+		--disable-tcl \
+		--disable-vv \
+		--disable-gstreamer \
+		--disable-gstreamer-interfaces \
+		--disable-farstream \
+		--enable-cyrus-sasl \
+		--enable-nss \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+finch() {
+	pkgdesc="text-based multi-protocol instant messaging client"
+	mkdir -p "$subpkgdir"/usr/lib "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/lib/gnt "$pkgdir"/usr/lib/libgnt.so.* \
+		"$pkgdir"/usr/lib/finch \
+		"$subpkgdir"/usr/lib/
+	mv "$pkgdir"/usr/bin/finch "$subpkgdir"/usr/bin/
+}
+
+libpurple() {
+	pkgdesc="multi-protocol instant messaging library"
+	mkdir -p "$subpkgdir"/usr/lib "$subpkgdir"/usr/share/sounds
+	mv "$pkgdir"/usr/lib/*purple* "$subpkgdir"/usr/lib/
+	mv "$pkgdir"/usr/share/purple "$pkgdir"/usr/share/sounds \
+		"$subpkgdir"/usr/share/
+}
+
+_mv_purple() {
+	pkgdesc="$1"
+	shift
+	mkdir -p "$subpkgdir"/usr/lib/purple-2/
+	for i; do
+		mv "$pkgdir"/usr/lib/purple-2/${i}.* \
+			"$subpkgdir"/usr/lib/purple-2/ || return 1
+	done
+}
+
+_bonjour() {
+	_mv_purple "bonjour plugin for libpurple" libbonjour
+}
+
+_oscar() {
+	_mv_purple "AIM, ICQ plugins for libpurple" liboscar libaim libicq
+}
+
+_xmpp() {
+	_mv_purple "Jabber/XMPP plugins for libpurple" libxmpp libjabber
+}
+
+sha512sums="e87b39888432982ee36332fd14b272f49f7974de9e8694f7fe3bec2821748d6e6026ac5a63615a93386a033d6ee7c4de5ae0a86b725f63b9cc55650f0ab94b06  pidgin-2.12.0.tar.bz2"

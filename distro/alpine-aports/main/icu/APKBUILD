@@ -1,0 +1,85 @@
+# Contributor: Sergey Lukin <sergej.lukin@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=icu
+pkgver=59.1
+
+# convert x.y.z to x_y_z
+_ver=${pkgver//./_}
+
+pkgrel=1
+pkgdesc="International Components for Unicode library"
+url="http://www.icu-project.org/"
+arch="all"
+license="custom:icu"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-libs"
+depends=
+checkdepends="diffutils"
+makedepends=
+source="http://download.icu-project.org/files/icu4c/${pkgver}/${pkgname}4c-$_ver-src.tgz
+	icu-timezone.patch
+	"
+
+# secfixes:
+#   57.1-r1:
+#     - CVE-2016-6293
+#   58.1-r1:
+#     - CVE-2016-7415
+#   58.2-r2:
+#     - CVE-2017-7867
+#     - CVE-2017-7868
+builddir="$srcdir"/icu/source
+
+prepare() {
+	cd "$builddir"
+	default_prepare
+	update_config_sub
+
+	# strtod_l() is not supported by musl; also xlocale.h is missing
+	# It is not possible to disable its use via configure switches or env vars
+	# so monkey patching is needed. Idea was stollen from openembedded
+	# https://github.com/openembedded/openembedded-core/blob/master/meta/recipes-support/icu/icu.inc#L30
+	sed -i -e 's,DU_HAVE_STRTOD_L=1,DU_HAVE_STRTOD_L=0,' configure.ac
+	sed -i -e 's,DU_HAVE_STRTOD_L=1,DU_HAVE_STRTOD_L=0,' configure
+
+	local x
+	# https://bugs.icu-project.org/trac/ticket/6102
+	for x in ARFLAGS CFLAGS CPPFLAGS CXXFLAGS FFLAGS LDFLAGS; do
+		sed -i -e "/^${x} =.*/s:@${x}@::" "config/Makefile.inc.in"
+	done
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--with-data-packaging=library \
+		--disable-samples \
+		--mandir=/usr/share/man
+	make
+}
+
+check() {
+	# armhf tests fail with gensprep: Bus error
+	[ "$CARCH" != armhf ] || return 0
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make -j1 DESTDIR="$pkgdir" install
+	chmod +x "$pkgdir"/usr/bin/icu-config
+	install -Dm644 "$srcdir"/icu/license.html \
+		"$pkgdir"/usr/share/licenses/icu/license.html
+}
+
+libs() {
+	default_libs
+	replaces="icu"
+}
+
+sha512sums="9348aa68d72a74cd1f26588c30c80eee1b48800a26930d7eb0749390fd65f7930ee8843058b6a6dd5f265e79054fef661e807ded16a1ad691cbc5ebc5ab944c4  icu4c-59_1-src.tgz
+40489c36e28e160f08e045acab6c19cdb712ad3b7f87f67099deac7d579aaf13d8841cd3278a6bb0e998b5c34a378348a13fcc8bb14c9c4eb4f6adbd10d66825  icu-timezone.patch"

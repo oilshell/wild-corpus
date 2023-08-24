@@ -1,0 +1,60 @@
+# Maintainer: Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=weechat
+pkgver=1.9.1
+pkgrel=0
+pkgdesc="A fast, light, extensible ncurses-based chat client"
+url="http://www.weechat.org"
+arch="all"
+license="GPL3+"
+depends_dev="cmake libintl ncurses-dev gnutls-dev libgcrypt-dev curl-dev
+	aspell-dev lua-dev perl-dev python2-dev ruby-dev"
+makedepends="$depends_dev"
+subpackages="$pkgname-dev $pkgname-aspell:_plugin $pkgname-lua:_plugin
+	$pkgname-perl:_plugin $pkgname-python:_plugin $pkgname-ruby:_plugin"
+source="http://www.weechat.org/files/src/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+# secfixes:
+#   1.7.1-r0:
+#   - CVE-2017-8073
+#   1.9.1-r0:
+#   - CVE-2017-14727
+
+prepare() {
+	cd "$builddir"
+	default_prepare
+}
+
+build() {
+	cd "$builddir"
+	mkdir -p build
+	cd build
+	cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_MAN=ON
+	make
+}
+
+package() {
+	cd "$builddir"/build
+	make DESTDIR="$pkgdir/" install
+}
+
+_plugin() {
+	local _name=${subpkgname#*-}
+	local _dir=usr/lib/weechat/plugins
+
+	pkgdesc="WeeChat $_name plugin"
+	depends="weechat"
+	if [ "$_name" = python2 ]; then
+		depends="$depends python2"
+	fi
+
+	mkdir -p "$subpkgdir"/$_dir
+	mv "$pkgdir"/$_dir/${_name}.so "$subpkgdir"/$_dir
+}
+
+check() {
+	cd "$builddir"
+	./tools/build-test.sh cmake
+}
+
+sha512sums="e52bb5239e24477ec38f2ad71cb2274e0ffc4226fc36ec00beeb7cf7e754a8c58d9bbc424cb0900e7c803ed47b0956e8f420eaa4cc9cf407ab6dd4769ec94326  weechat-1.9.1.tar.gz"

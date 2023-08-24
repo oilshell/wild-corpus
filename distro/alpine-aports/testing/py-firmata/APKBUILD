@@ -1,0 +1,41 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-firmata
+_pkgname=pyFirmata
+pkgver=1.0.2
+pkgrel=0
+pkgdesc="A Python interface for the Firmata procotol"
+url="https://github.com/tino/pyFirmata"
+arch="noarch"
+license="MIT"
+depends="python2 py-serial"
+depends_dev=""
+makedepends="python2-dev py-setuptools"
+install=""
+subpackages=""
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+
+_builddir="$srcdir"/$_pkgname-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	python2 setup.py build || return 1
+}
+
+package() {
+	cd "$_builddir"
+	python2 setup.py install --prefix=/usr --root="$pkgdir" || return 1
+}
+
+md5sums="fddd3d9882cb0a672f15877c9e1c17a9  pyFirmata-1.0.2.tar.gz"
+sha256sums="81bc2704109161cee7c4c0544578be044a4be31d86fcb157c7bc53484015b634  pyFirmata-1.0.2.tar.gz"
+sha512sums="ff9eed2ca0e53010bd21cfbdbaa6f874cc2fd2431f8e5871de1f2c1168fd5cfb4a340425d116bb997fd04a067b74f4573c009588c553eadabd2d3698db5c6cb5  pyFirmata-1.0.2.tar.gz"

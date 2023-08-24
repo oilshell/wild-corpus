@@ -1,0 +1,40 @@
+# Contributor: Leonardo Arena <rnalrd@alpinelinux.org>
+# Maintainer:  Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=perl-libwww
+_realname=libwww-perl
+pkgver=6.27
+pkgrel=0
+pkgdesc="Perl module - World Wide Web library"
+url="http://search.cpan.org/~mschilli"
+arch="noarch"
+license="GPL PerlArtistic"
+depends="perl-http-date perl-http-cookies perl-net-http perl-http-daemon
+	perl-html-parser perl-file-listing perl-www-robotrules
+	perl-http-negotiate perl-uri perl-http-message
+	perl-lwp-mediatypes perl-encode-locale perl-try-tiny"
+makedepends="perl-dev perl-test-fatal perl-test-requiresinternet"
+install=
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/libwww-perl/libwww-perl/archive/v$pkgver.tar.gz"
+
+builddir="$srcdir/$_realname-$pkgver"
+
+build() {
+	cd $builddir
+	PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor || return 1
+	make || return 1
+}
+
+check() {
+	cd $builddir
+	make test || return 1
+}
+
+package() {
+	cd $builddir
+	make DESTDIR="$pkgdir" install
+	# creates file collision among perl modules
+	find "$pkgdir" -name perllocal.pod -delete
+}
+
+sha512sums="e40dd171503785819f4e93f4ca52cfce9f282828cf96ab7bc42022f8e6bed741af22686b4ad1d689da7507ba108328c2a91ed26d2a4fba935803e791c016320a  perl-libwww-6.27.tar.gz"

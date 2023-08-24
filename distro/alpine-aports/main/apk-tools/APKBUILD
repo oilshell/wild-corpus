@@ -1,0 +1,87 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=apk-tools
+pkgver=2.8.0
+pkgrel=1
+pkgdesc="Alpine Package Keeper - package manager for alpine"
+subpackages="$pkgname-static"
+depends=
+makedepends_build=""
+makedepends_host="zlib-dev libressl libressl-dev linux-headers"
+makedepends="$makedepends_build $makedepends_host"
+if [ "$CBUILD" = "$CHOST" ]; then
+	subpackages="$subpackages lua5.2-apk:luaapk"
+	makedepends="$makedepends lua5.2-dev"
+fi
+source="http://dev.alpinelinux.org/archive/$pkgname/$pkgname-$pkgver.tar.xz
+	0001-db-handle-default-root-correctly-for-proc.patch
+	"
+
+url="http://git.alpinelinux.org/cgit/apk-tools/"
+arch="all"
+license=GPL2
+
+builddir="$srcdir/$pkgname-$pkgver"
+prepare() {
+	default_prepare || return 1
+	cd "$builddir"
+	sed -i -e 's:-Werror::' Make.rules
+	echo "FULL_VERSION=$pkgver-r$pkgrel" > config.mk || return 1
+	if [ "$CBUILD" = "$CHOST" ]; then
+		echo "LUAAPK=YesPlease" >> config.mk
+	else
+		echo "LUAAPK=" >> config.mk
+	fi
+	echo "export LUAAPK" >> config.mk
+}
+
+build() {
+	cd "$builddir"
+	make || return 1
+	make static || return 1
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	install -d "$pkgdir"/var/lib/apk \
+		"$pkgdir"/var/cache/misc \
+		"$pkgdir"/etc/apk/keys \
+		"$pkgdir"/etc/apk/protected_paths.d \
+		|| return 1
+	# the shipped README is empty
+	rm -r "$pkgdir"/usr/share/
+}
+
+static() {
+	pkgdesc="Alpine Package Keeper - static binary"
+	install -Dm755 "$srcdir"/$pkgname-$pkgver/src/apk.static \
+		"$subpkgdir"/sbin/apk.static
+
+	# lets sign the static binary so it can be vefified from distros
+	# that does not have apk-tools
+	local abuild_conf=${ABUILD_CONF:-"/etc/abuild.conf"}
+	local abuild_home=${ABUILD_USERDIR:-"$HOME/.abuild"}
+	local abuild_userconf=${ABUILD_USERCONF:-"$abuild_home/abuild.conf"}
+	[ -f "$abuild_userconf" ] && . "$abuild_userconf"
+	local privkey="$PACKAGER_PRIVKEY"
+	local pubkey=${PACKAGER_PUBKEY:-"${privkey}.pub"}
+	local keyname=${pubkey##*/}
+	${CROSS_COMPILE}strip "$subpkgdir"/sbin/apk.static
+	openssl dgst -sha1 -sign "$privkey" \
+		-out "$subpkgdir"/sbin/apk.static.SIGN.RSA.$keyname \
+		"$subpkgdir"/sbin/apk.static || return 1
+}
+
+luaapk() {
+	pkgdesc="Lua module for apk-tools"
+	mkdir -p "$subpkgdir"/usr/
+	mv "$pkgdir"/usr/lib "$subpkgdir"/usr/lib/
+}
+
+sha512sums="dc23d83bf8faeacb17426792b1c25c9540dd8379015f2be729dc03c4b65e6ed4463eb879e0f0e72fc36a1185d56fdd3c4fbb13476fe8d7cb415f1730362ac718  apk-tools-2.8.0.tar.xz
+48e4b95fc11df29e721f4cc51f14802bf5acfd54cd5b6754b544a0e6846e6d7272719ef028c9e4ba54eeb70f9b7e846cd4db936595392d35e9c5fde2d837ad36  0001-db-handle-default-root-correctly-for-proc.patch"

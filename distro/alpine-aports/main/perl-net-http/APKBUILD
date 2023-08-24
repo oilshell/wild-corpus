@@ -1,0 +1,36 @@
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=perl-net-http
+pkgver=6.09
+pkgrel=1
+pkgdesc="Net::HTTP perl module"
+url="http://search.cpan.org/dist/Net-HTTP/"
+arch="noarch"
+license="GPLv2 or Artistic"
+depends="perl perl-uri"
+makedepends="perl-dev"
+install=""
+replaces="perl-libwww"
+subpackages="$pkgname-doc"
+source="http://search.cpan.org/CPAN/authors/id/E/ET/ETHER/Net-HTTP-$pkgver.tar.gz"
+
+builddir="$srcdir"/Net-HTTP-$pkgver
+
+build() {
+	cd "$builddir"
+	PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor
+	make
+}
+
+check() {
+	cd "$builddir"
+	make test
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	find "$pkgdir" \( -name perllocal.pod -o -name .packlist \) -delete
+}
+
+sha512sums="ae36c8367206f18190237f9c6db417054b78f99cfa79cc651550d3612505faf9d31e415c8b32e7f87f4fd389ccaa0e23f62c3781f6f27485b7296b2fe48d7e45  Net-HTTP-6.09.tar.gz"

@@ -1,0 +1,45 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Contributor: Francesco Colista <fcolista@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=cvechecker
+pkgver=3.8
+pkgrel=1
+pkgdesc="A local CVE checker tool"
+url="https://github.com/sjvermeu/cvechecker/wiki"
+arch="all"
+license="GPL3"
+depends="gawk wget libxslt"
+makedepends="libconfig-dev sqlite-dev libressl-dev mariadb-dev argp-standalone"
+install="$pkgname.pre-install $pkgname.post-install"
+subpackages="$pkgname-doc"
+pkggroups="$pkgname"
+source="https://raw.githubusercontent.com/wiki/sjvermeu/$pkgname/releases/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+build() {
+	cd "$builddir"
+	export LIBS="-largp"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--enable-sqlite3 \
+		--enable-mysql
+	make
+}
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	mkdir -p "$pkgdir"/var/cvechecker &>/dev/null
+	chgrp -R $pkggroups "$pkgdir"/var/cvechecker/* &>/dev/null
+	chmod -R g+w "$pkgdir"/var/cvechecker &>/dev/null
+}
+
+sha512sums="c7d83592d708d2d7b218f97f5780a442014793163260ba0a3d3aefb329c4e1b24924a461ca37df0d7d3b3e17ac16b29a1eed57169316c9d8cbf780550462f948  cvechecker-3.8.tar.gz"

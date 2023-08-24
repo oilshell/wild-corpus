@@ -1,0 +1,40 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libosinfo
+pkgver=1.0.0
+pkgrel=2
+pkgdesc="A library for managing OS information for virtualization"
+url="http://libosinfo.org/"
+arch="all"
+license="LGPLv2+"
+depends="hwdata osinfo-db"
+makedepends="glib-dev libsoup-dev libxml2-dev libxslt-dev vala intltool
+	gobject-introspection-dev check-dev perl-dev"
+subpackages="$pkgname-dev $pkgname-doc"
+source="https://releases.pagure.org/$pkgname/$pkgname-$pkgver.tar.gz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--enable-introspection=yes \
+		--enable-vala=yes \
+		--with-usb-ids-path=/usr/share/hwdata/usb.ids \
+		--with-pci-ids-path=/usr/share/hwdata/pci.ids \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+sha512sums="962b68b2f6639c70b1ab7377475bbddc99a056075e18d1f281e65188eb8a704b932e7ed26362a36ae805d53137e99b0f8303d18a5a1d7b840fad15eb188ab7d0  libosinfo-1.0.0.tar.gz"

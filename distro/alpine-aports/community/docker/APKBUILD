@@ -1,0 +1,244 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=docker
+pkgver=17.07.0
+_ver=${pkgver/_/-}-ce
+pkgrel=0
+_gitcommit=v$_ver
+pkgdesc="Pack, ship and run any application as a lightweight container"
+url="http://www.docker.io/"
+arch="all !s390x"
+license="ASL 2.0"
+depends="ca-certificates iptables"
+depends_dev=""
+makedepends="go btrfs-progs-dev bash linux-headers coreutils libseccomp-dev cmake lvm2-dev glide libtool"
+options="!check"
+install="$pkgname.pre-install"
+
+# $ grep COMMIT hack/dockerfile/binaries-commits
+# TOMLV_COMMIT=9baf8a8a9f2ed20a8e54160840c492f937eeaf9a
+# RUNC_COMMIT=2d41c047c83e09a6d61d464906feb2a2f3c52aa4
+# CONTAINERD_COMMIT=3addd840653146c90a254301d6c3a663c7fd6429
+# TINI_COMMIT=949e6facb77383876aeff8a6944dde66b3089574
+# LIBNETWORK_COMMIT=7b2b1feb1de4817d522cc372af149ff48d25028e
+# VNDR_COMMIT=9909bb2b8a0b7ea464527b376dc50389c90df587
+
+_runc_ver=2d41c047c83e09a6d61d464906feb2a2f3c52aa4
+_containerd_ver=3addd840653146c90a254301d6c3a663c7fd6429
+_libnetwork_ver=7b2b1feb1de4817d522cc372af149ff48d25028e
+_tini_ver=949e6facb77383876aeff8a6944dde66b3089574
+
+subpackages="
+	$pkgname-bash-completion:bashcomp:noarch
+	$pkgname-fish-completion:fishcomp:noarch
+	$pkgname-zsh-completion:zshcomp:noarch
+	$pkgname-vim:vim:noarch
+	$pkgname-doc
+	"
+source="
+	docker-$pkgver.tar.gz::https://github.com/docker/docker-ce/archive/v$_ver.tar.gz
+	runc-$_runc_ver.tar.gz::https://github.com/docker/runc/archive/$_runc_ver.tar.gz
+	containerd-$_containerd_ver.tar.gz::https://github.com/docker/containerd/archive/$_containerd_ver.tar.gz
+	libnetwork-$_libnetwork_ver.tar.gz::https://github.com/docker/libnetwork/archive/$_libnetwork_ver.tar.gz
+	tini-$_tini_ver.tar.gz::https://github.com/krallin/tini/archive/$_tini_ver.tar.gz
+	go-md2man.tar.gz::https://github.com/cpuguy83/go-md2man/archive/master.tar.gz
+	cobra.tar.gz::https://github.com/spf13/cobra/archive/master.tar.gz
+	docker-openrc-fixes.patch
+	tini-cmake-fixes.patch
+	docker-openrc-busybox-ash.patch
+	"
+
+_dockerdir="$srcdir"/docker-$_ver
+_cli_builddir="$_dockerdir"/components/cli
+_daemon_builddir="$_dockerdir"/components/engine
+#_buildtags="exclude_graphdriver_aufs exclude_graphdriver_devicemapper"
+_buildtags=""
+_runc_buildtags="seccomp"
+_runc_builddir="$srcdir"/runc-$_runc_ver
+
+_containerd_builddir="$srcdir"/containerd-$_containerd_ver
+_libnetwork_builddir="$srcdir"/libnetwork-$_libnetwork_ver
+_tini_builddir="$srcdir"/tini-$_tini_ver
+
+_apply_patches() {
+	local _dir="$1"
+	local _prefix="$2"
+	local i
+	msg "applying patches for $_prefix"
+	cd "$_dir"
+	for i in $source; do
+		case $i in
+		${_prefix}-*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+prepare() {
+	# Rename 'docker-ce-VER' to 'docker-VER'
+	mv "$srcdir"/docker-ce-$_ver "$_dockerdir"
+
+	_apply_patches "$_daemon_builddir" docker || return 1
+	_apply_patches "$_runc_builddir" runc || return 1
+	_apply_patches "$_tini_builddir" tini || return 1
+}
+
+build() {
+	export AUTO_GOPATH=1
+	#export GOPATH="$srcdir"
+	#export GOBIN="$GOPATH"/bin
+	#export PATH="$GOBIN:$PATH"
+	export DOCKER_GITCOMMIT=$_gitcommit
+	export DOCKER_BUILDTAGS=$_buildtags
+	unset CC # prevent possible ccache issues
+
+	# containerd
+	msg "building containerd"
+	cd "$_containerd_builddir" || return 1
+	mkdir -p src/github.com/containerd/
+	ln -s "$_containerd_builddir" src/github.com/containerd/containerd
+	GOPATH="$PWD" LDFLAGS="" make GIT_COMMIT="$_containerd_ver" || return 1
+
+	# libnetwork (docker-proxy)
+	msg "building docker-proxy"
+	cd "$_libnetwork_builddir" || return 1
+	mkdir -p src/github.com/docker/
+	ln -s "$_libnetwork_builddir" src/github.com/docker/libnetwork
+	GOPATH="$PWD" go build -v -ldflags="-linkmode=external" -o docker-proxy github.com/docker/libnetwork/cmd/proxy || return 1
+
+	# runc
+	msg "building runc"
+	cd "$_runc_builddir" || return 1
+	mkdir -p src/github.com/opencontainers/
+	ln -s "$_runc_builddir" src/github.com/opencontainers/runc
+	cd src/github.com/opencontainers/runc
+	GOPATH="$PWD" make COMMIT="$_runc_ver" || return 1
+
+	# tini
+	msg "building tini"
+	cd "$_tini_builddir" || return 1
+	cmake -DVERSION_GIT=$_tini_ver || return 1
+	make tini-static|| return 1
+
+	# daemon
+	msg "building daemon"
+	cd "$_daemon_builddir" || return 1
+	mkdir -p src/github.com/docker/
+	ln -s "$_daemon_builddir" src/github.com/docker/docker
+	GOPATH="$PWD" VERSION="$_ver" hack/make.sh dynbinary
+
+	# Required for building man-pages
+	export GOPATH="$_cli_builddir"
+	export GOBIN="$GOPATH/bin"
+	export PATH="$GOBIN:$PATH"
+
+	# cli
+	msg "building cli"
+	cd "$_cli_builddir" || return 1
+	mkdir -p "$GOPATH"/src/github.com/docker/
+	ln -s "$_cli_builddir" "$GOPATH"/src/github.com/docker/cli
+	LDFLAGS="" make VERSION="$_ver" dynbinary || return 1
+
+	# docker man
+	msg "building docker man pages"
+	cd "$srcdir" || return 1
+	# cobra
+	mkdir -p "$GOPATH"/src/github.com/spf13/
+	ln -sf "$PWD"/cobra-master "$GOPATH"/src/github.com/spf13/cobra
+	# md2man
+	mkdir -p "$GOPATH"/src/github.com/cpuguy83/
+	ln -s "$PWD"/go-md2man-master "$GOPATH"/src/github.com/cpuguy83/go-md2man
+	cd "$GOPATH"/src/github.com/cpuguy83/go-md2man || return 1
+	go get
+
+	# convert md to man pages
+	msg "generating man pages"
+	cd "$_cli_builddir" || return 1
+	make manpages
+}
+
+package() {
+	cd "$_dockerdir"
+	local ver=$(cat VERSION)
+
+	# 'build/docker' is a symlink to 'docker-linux-$arch' e.g. 'docker-linux-amd64'
+	install -Dm755 "$_cli_builddir"/build/docker \
+		"$pkgdir"/usr/bin/docker || return 1
+
+	install -Dm755 "$_daemon_builddir"/bundles/$ver/dynbinary-daemon/dockerd-$ver \
+		"$pkgdir"/usr/bin/dockerd || return 1
+
+	install -Dm755 "$_libnetwork_builddir"/docker-proxy \
+		"$pkgdir"/usr/bin/docker-proxy || return 1
+
+	install -Dm755 "$_runc_builddir"/runc \
+		"$pkgdir"/usr/bin/docker-runc || return 1
+
+	install -Dm755 "$_containerd_builddir"/bin/containerd \
+		"$pkgdir"/usr/bin/docker-containerd || return 1
+
+	install -Dm755 "$_containerd_builddir"/bin/containerd-shim \
+		"$pkgdir"/usr/bin/docker-containerd-shim || return 1
+
+	install -Dm755 "$_containerd_builddir"/bin/ctr \
+		"$pkgdir"/usr/bin/docker-containerd-ctr || return 1
+
+	install -Dm755 "$_tini_builddir"/tini-static \
+		"$pkgdir"/usr/bin/docker-init || return 1
+
+	install -Dm755 "$_daemon_builddir"/contrib/init/openrc/docker.initd \
+		"$pkgdir"/etc/init.d/docker || return 1
+	install -Dm644 "$_daemon_builddir"/contrib/init/openrc/docker.confd \
+		"$pkgdir"/etc/conf.d/docker || return 1
+
+	mkdir -p "$pkgdir"/usr/share/man/man1
+	install -Dm644 "$_cli_builddir"/man/man1/* \
+		"$pkgdir"/usr/share/man/man1 || return 1
+}
+
+bashcomp() {
+	pkgdesc="Bash completion for Docker"
+	depends=""
+	install_if="$pkgname=$pkgver-r$pkgrel bash-completion"
+
+	install -Dm644 "$_cli_builddir"/contrib/completion/bash/$pkgname \
+		"$subpkgdir"/usr/share/bash-completion/completions/$pkgname
+}
+
+fishcomp() {
+	pkgdesc="Fish shell completion for Docker"
+	depends=""
+	install_if="$pkgname=$pkgver-r$pkgrel fish"
+
+	install -Dm644 "$_cli_builddir"/contrib/completion/fish/$pkgname.fish \
+		"$subpkgdir"/usr/share/fish/completions/$pkgname.fish || return 1
+}
+
+zshcomp() {
+	pkgdesc="Zsh completion for $pkgname"
+	depends=""
+	install_if="$pkgname=$pkgver-r$pkgrel zsh"
+
+	install -Dm644 "$_cli_builddir"/contrib/completion/zsh/_$pkgname \
+		"$subpkgdir"/usr/share/zsh/site-functions/_$pkgname || return 1
+}
+
+vim() {
+	depends=""
+	pkgdesc="Vim syntax for Docker"
+
+	local f=
+	for f in ftdetect/dockerfile.vim syntax/dockerfile.vim; do
+		install -Dm644 "$_daemon_builddir"/contrib/syntax/vim/$f \
+			"$subpkgdir"/usr/share/vim/vimfiles/$f
+	done
+}
+
+sha512sums="c34164983021e7de9872510f739446f372444147e336e928b1b4d7bd87876440ec2358206bf0fcc231ead03c0171a8bde0b897f044d9bd696ac5f1cf203fc9db  docker-17.07.0.tar.gz
+4c86946a8200db67b3c914dd5e52e64e27d417b1fd2fdecd57d12de76798d554ed05acd761b58020d262fda2f98f15e45385ae621666952b1d82a28f7dd7918a  runc-2d41c047c83e09a6d61d464906feb2a2f3c52aa4.tar.gz
+cc8cdfbac5b2ea671d96a9016d53a510bd2d7854d9d8cdd551929568a47eaaed044f2ae1152acf83a487aa2f7df8b61ffb00de3d4f837d93eee383d96929ace4  containerd-3addd840653146c90a254301d6c3a663c7fd6429.tar.gz
+673ea638fa5c560d8238d7c1d88f114430f9d8efe701804bfe30044d0c059a688cbf6b62922be50834e16ee055ef6cf015f6232f76f0d942768f9e84e95496cd  libnetwork-7b2b1feb1de4817d522cc372af149ff48d25028e.tar.gz
+b6c1454f734662adf2fdedcb75cb7cdc82f4cf5b4c41fadf6891a670fa26d49b789034f4af8bf920b9e1ff1c3536123637ade9471f4ae2c1ef6c534e839b9f27  tini-949e6facb77383876aeff8a6944dde66b3089574.tar.gz
+4fe8c193b1d1f64d9fce656842d47a9beba672b947c29e2f2ae50a7d13a13b8ac5c22ed2a4c76c4df3cc384282b79496067f27046800ebbb2c957c00a7eaed9a  go-md2man.tar.gz
+31b71f60505c6442a9b048a8346c6a990cf334774e6c9172181a8123ab513ac37bfef01d86cc866a0dec8ba97d61ed064a3b3f4a15b23715b9a7d81a1395ef80  cobra.tar.gz
+8296b1bc88ef3dec4f9038c4e0bf83120ac5870860f6662eac9f9f8850ea8b7596bcd2b47932551e804ae8b6f6f26ad3bc4ce6d49600cc8eaf0a3016c15a9ccf  docker-openrc-fixes.patch
+29a343848d0aa14864c6bfc87c2a6fd408f546f0114e12f7035fb4678ee769fe728872a5d283803177990a61d7e02c4916017d5e45380ad3b0a2dffa3e746857  tini-cmake-fixes.patch
+9b24dc0c50904c3d12bb04c1a7df169651043ddbc258018647010a5aa01d8a19ad54d10ca79dce6d6283c81f4fa0cc8de417f6180dd824c5a588b22b23546cb5  docker-openrc-busybox-ash.patch"

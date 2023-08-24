@@ -1,0 +1,35 @@
+# Contributor: William Pitcock <nenolod@dereferenced.org>
+# Maintainer: William Pitcock <nenolod@dereferenced.org>
+pkgname=gnome-keyring
+pkgver=3.20.1
+pkgrel=0
+pkgdesc="GNOME keyring"
+url="http://www.gnome.org"
+arch="all"
+license="GPL"
+options="!check"
+makedepends="gtk+3.0-dev gcr-dev libcap-ng-dev
+	intltool gobject-introspection-dev gtk-doc libxslt"
+subpackages="$pkgname-lang $pkgname-doc"
+source="http://ftp.gnome.org/pub/GNOME/sources/${pkgname}/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz
+	fix-includes.patch"
+builddir="${srcdir}/${pkgname}-${pkgver}"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc
+	make
+}
+
+package() {
+	cd "$builddir"
+	export GCONF_DISABLE_MAKEFILE_SCHEMA_INSTALL=1
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="a60d8a4b17a9c6d8c581578881abaf7d79de43045a314b401e3bfd3974edb4ab94117dd430203b721058f432b24bf6296e0b7c4fba1e66cccd2c2e9441787177  gnome-keyring-3.20.1.tar.xz
+99af8b23c8b53bc1e70f921c872563b779c1ec59db72474b62e6d693f0d82d38b94607c8b9d53e751cf4a44873c91e283bc27d69f37433a37aa40e990caa1249  fix-includes.patch"

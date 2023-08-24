@@ -1,0 +1,39 @@
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=rest
+pkgver=0.8.0
+pkgrel=1
+pkgdesc="A library for access to RESTful web services"
+url="http://www.gnome.org"
+arch="all"
+license="LGPL2+"
+depends_dev="libsoup-dev gobject-introspection-dev"
+makedepends="$depends_dev"
+subpackages="$pkgname-dev $pkgname-doc"
+source="http://ftp.gnome.org/pub/gnome/sources/rest/${pkgver%.*}/rest-$pkgver.tar.xz"
+
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--disable-static \
+		--enable-introspection \
+		--without-gnome
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+
+}
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="dfcfed4196e613ed4415ea04eaa890e47d1d2e6899afdefff3dd7bfed5bcace58724158deb4c0cc7974f9a4493d00d5c0a27415160f2795df81c2210c14a823a  rest-0.8.0.tar.xz"

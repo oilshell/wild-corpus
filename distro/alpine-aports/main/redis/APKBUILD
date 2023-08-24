@@ -1,0 +1,81 @@
+# Contributor: V.Krishn <vkrishn4@gmail.com>
+# Maintainer: Eivind Uggedal <eivind@uggedal.com>
+pkgname=redis
+pkgver=4.0.2
+pkgrel=0
+pkgdesc="Advanced key-value store"
+url="http://redis.io/"
+arch="all"
+license="BSD"
+depends=""
+makedepends="linux-headers"
+checkdepends="tcl"
+install="redis.pre-install"
+pkgusers="redis"
+pkggroups="redis"
+source="http://download.redis.io/releases/$pkgname-$pkgver.tar.gz
+	redis.initd
+	redis.logrotate
+	redis.confd
+	"
+builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	default_prepare
+
+	cd "$builddir"
+	sed -i -e 's|^daemonize .*|daemonize yes|' \
+		-e 's|^dir .*|dir /var/lib/redis/|' \
+		-e 's|^logfile .*|logfile /var/log/redis/redis\.log|' \
+		-e 's|^pidfile .*|pidfile /var/run/redis/redis\.pid|' \
+		-e 's|^loglevel .*|loglevel notice|' \
+		redis.conf
+
+	# disable broken tests
+	# see: https://github.com/antirez/redis/issues/2814
+	#      https://github.com/antirez/redis/issues/3810
+
+	sed -i -e '/integration\/aof/d' \
+	       -e '/integration\/logging/d' \
+		tests/test_helper.tcl
+}
+
+build() {
+	cd "$builddir"
+	make PREFIX=/usr \
+		INSTALL_BIN="$pkgdir"/usr/bin \
+		MALLOC=libc \
+		all
+}
+
+check() {
+	cd "$builddir"
+	make test
+}
+
+package() {
+	cd "$builddir"
+	mkdir -p "$pkgdir"/usr/bin
+	install -d -o redis -g redis \
+		"$pkgdir"/var/lib/redis \
+		"$pkgdir"/var/log/redis \
+		"$pkgdir"/var/run/redis
+
+	install -D -m755 "$builddir/COPYING" \
+		"$pkgdir/usr/share/licenses/redis/COPYING"
+        install -D -m755 "$srcdir/redis.initd" "$pkgdir/etc/init.d/redis" \
+		&& install -Dm644 "$srcdir/redis.logrotate" \
+			"$pkgdir/etc/logrotate.d/redis" \
+		&& install -Dm644 "$srcdir/redis.confd" \
+			"$pkgdir/etc/conf.d/redis"
+        install -D -m644 "$builddir/redis.conf" "$pkgdir/etc/redis.conf"
+
+	make PREFIX=/usr \
+		INSTALL_BIN="$pkgdir/usr/bin" \
+		install
+}
+
+sha512sums="1458909c6fc16cff8ca5e6dddff23b988ee1e447f2d0bccf5941553b22bab6abb851732b3fe53dafb8a69d6c0939c3ce7e0686d51e03be720fb018c038d3b1b4  redis-4.0.2.tar.gz
+91b663f802aea9a473195940d3bf2ce3ca2af4e5b6e61a2d28ebbfe502ef2c764b574b7e87c49e60345d1a5d6b73d12920924c93b26be110c2ce824023347b6f  redis.initd
+6d17d169b40a7e23a0a2894eff0f3e2fe8e4461b36f2a9d45468f0abd84ea1035d679b4c0a34029bce093147f9c7bb697e843c113c17769d38c934d4a78a5848  redis.logrotate
+d87aad6185300c99cc9b6a478c83bf62c450fb2c225592d74cc43a3adb93e19d8d2a42cc279907b385aa73a7b9c77b66828dbfb001009edc16a604abb2087e99  redis.confd"

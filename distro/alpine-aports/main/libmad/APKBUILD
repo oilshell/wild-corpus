@@ -1,0 +1,54 @@
+# Contributor: Sebastian Wicki <gandro@gmx.net>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libmad
+pkgver=0.15.1b
+pkgrel=7
+pkgdesc="A high-quality MPEG audio decoder"
+url="http://www.underbit.com/products/mad/"
+arch="all"
+license="GPL"
+subpackages="$pkgname-dev"
+depends=
+makedepends="autoconf automake libtool"
+source="http://downloads.sourceforge.net/sourceforge/mad/$pkgname-$pkgver.tar.gz
+	libmad-0.15.1b-cflags-O2.patch
+	libmad-0.15.1b-cflags.patch
+	automake.patch
+	mad.pc
+	"
+
+_builddir="$srcdir"/$pkgname-$pkgver
+prepare() {
+	cd "$_builddir"
+	update_config_sub || return 1
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+	libtoolize --force && aclocal -I m4 && autoconf \
+		&& automake --add-missing --foreign || return 1
+}
+
+build() {
+	cd "$_builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--enable-accuracy \
+		|| return 1
+
+	make -j1 || return 1
+}
+
+package() {
+	cd "$srcdir"/$pkgname-$pkgver
+	make DESTDIR="$pkgdir" install || return 1
+	install -D -m644 "$srcdir"/mad.pc "$pkgdir"/usr/lib/pkgconfig/mad.pc
+}
+sha512sums="2cad30347fb310dc605c46bacd9da117f447a5cabedd8fefdb24ab5de641429e5ec5ce8af7aefa6a75a3f545d3adfa255e3fa0a2d50971f76bc0c4fc0400cc45  libmad-0.15.1b.tar.gz
+13a8bac30cea4861f903b4abc8673f9a35b6253aae6a02915f99b67e5e8c56460fc1fb059a0aa52143b665f888928baba098daf0ed022420e46317be4dbc6161  libmad-0.15.1b-cflags-O2.patch
+01dc8421dba2b652aa8ca6d1f1a5c310645465b18190ebfdeaae516de881869957e8e7c0c373d0d09623da33719d01e028f2f6164790b54c43a71271f5b4dbba  libmad-0.15.1b-cflags.patch
+e73ec5ae3b14e8d45579b52bcc561a309b85e1e51d946e061e2f0a9252f515e48e2d818e8bdce1adf5a9801ec314be8c911914d0bb12f9113a7afc54cf385250  automake.patch
+ec0b14bd0c6236a216107b507b92c06e295352f1657ba5e45f37fff220a73e1454b262ac36fc715d698c4ffd210d348fca71cf0198e2c49d16fe0ec5ea839f08  mad.pc"

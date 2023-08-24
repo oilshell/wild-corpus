@@ -1,0 +1,39 @@
+# Maintainer: Kiyoshi Aman <kiyoshi.aman@gmail.com>
+pkgname=perl-json
+_pkgreal=JSON
+pkgver=2.90
+pkgrel=1
+pkgdesc="Perl module implementing a JSON encoder/decoder"
+url="http://search.cpan.org/dist/JSON/"
+arch="noarch"
+license="GPL PerlArtistic"
+depends=
+depends_dev=
+makedepends="perl-dev"
+install=""
+subpackages="$pkgname-doc"
+source="http://search.cpan.org/CPAN/authors/id/M/MA/MAKAMAKA/$_pkgreal-$pkgver.tar.gz"
+
+builddir="$srcdir/$_pkgreal-$pkgver"
+
+build() {
+	cd "$builddir"
+        PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor
+	make
+}
+
+check() {
+	cd "$builddir"
+	make test
+}
+
+package() {
+        cd "$builddir"
+	make DESTDIR="$pkgdir" install
+        find "$pkgdir" -name perllocal.pod -delete
+        find "$pkgdir" -name .packlist -delete
+}
+
+md5sums="e1512169a623e790a3f69b599cc1d3b9  JSON-2.90.tar.gz"
+sha256sums="4ddbb3cb985a79f69a34e7c26cde1c81120d03487e87366f9a119f90f7bdfe88  JSON-2.90.tar.gz"
+sha512sums="72462a468aa37da73d164c91b5123c237c268f87215019fae49b7f212b0a25e0b48cd57b3cf0bd93c9fff6afc553b2417faafc0c319e62cb0cf4b1cf432698e7  JSON-2.90.tar.gz"

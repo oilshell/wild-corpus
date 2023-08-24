@@ -1,0 +1,46 @@
+# Contributor: William Pitcock <nenolod@dereferenced.org>
+# Maintainer: William Pitcock <nenolod@dereferenced.org>
+pkgname=py-sqlalchemy
+_pkgname=SQLAlchemy
+pkgver=1.1.14
+pkgrel=0
+pkgdesc="An object relational mapper for Python"
+url="http://pypi.python.org/pypi/SQLAlchemy"
+arch="all"
+license="MIT"
+depends=""
+makedepends="python2-dev py-setuptools python3-dev"
+subpackages="py3-${pkgname#py-}:_py3 py2-${pkgname#py-}:_py2"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc ${python:6:1}"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+sha512sums="82b9a97553a27e8d366401b1b99ebc884ee3a95f7ccefc27dae50bc335e30a4c019906caf07238c2a91b7b89a4a5a5e1118defb11e6a2719b631ca0d1e0905a1  SQLAlchemy-1.1.14.tar.gz"

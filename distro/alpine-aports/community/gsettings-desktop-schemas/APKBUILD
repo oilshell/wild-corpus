@@ -1,0 +1,50 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=gsettings-desktop-schemas
+pkgver=3.24.1
+pkgrel=0
+pkgdesc="A collection of GSettings schemas"
+url="http://bugzilla.gnome.org/enter_bug.cgi?product=gsettings-desktop-schemas"
+arch="noarch"
+license="LGPLv2+"
+makedepends="glib-dev intltool gobject-introspection-dev"
+subpackages="$pkgname-dev"
+source="http://ftp.gnome.org/pub/GNOME/sources/$pkgname/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+prepare() {
+	default_prepare
+	cd "$builddir"
+	sed -i -r 's:"(/system):"/org/gnome\1:g' schemas/*.in
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--disable-nls
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make install DESTDIR="$pkgdir"
+}
+
+dev() {	
+	default_dev
+	cd "$builddir"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/share/pkgconfig "$subpkgdir"/usr/lib
+}
+
+
+sha512sums="c3970d61cc1c29bf97a39c439b3e0ba5c5d5c0f811e17b8884f106f095b159dd0c43cb90e02561edcc26e15b2b887e960d38de1c0e7498413db0c63102f15833  gsettings-desktop-schemas-3.24.1.tar.xz"

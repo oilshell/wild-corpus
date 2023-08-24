@@ -1,0 +1,111 @@
+#!/bin/bash
+{
+	#////////////////////////////////////
+	# DietPi Function:
+	# - Setup and apply DietPi smbclient details
+	#
+	#////////////////////////////////////
+	# Created by Daniel Knight / daniel.knight@dietpi.com / dietpi.com
+	#
+	#////////////////////////////////////
+	#
+	# Info:
+	# - Menu system that allows users to change Samba Client details stored in dietpi.txt and automatically mount.
+	# - Applies details to /etc/fstab
+	# - Mounts to /mnt/samba if successful
+	#
+	# Usage:
+	# - /DietPi/dietpi/func/dietpi-set_smbclient	= Menu
+	# - /DietPi/dietpi/func/dietpi-set_smbclient 1	= Apply and mount using settings in dietpi.txt
+	#////////////////////////////////////
+
+	#Grab Input
+	INPUT=0
+	if [[ $1 =~ ^-?[0-9]+$ ]]; then
+		INPUT=$1
+	fi
+
+	#Import DietPi-Globals ---------------------------------------------------------------
+	. /DietPi/dietpi/func/dietpi-globals
+	G_CHECK_ROOT_USER
+	export G_PROGRAM_NAME='DietPi-Set_smbclient'
+	#Import DietPi-Globals ---------------------------------------------------------------
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#smbclient data
+	#/////////////////////////////////////////////////////////////////////////////////////
+	OPTION=0
+	CHOICE=0
+	samba_clientname=$(cat /DietPi/dietpi.txt | grep -m1 '^CONFIG_SMBCLIENT_COMPUTERNAME=' | sed 's/.*=//')
+	samba_clientshare=$(cat /DietPi/dietpi.txt | grep -m1 '^CONFIG_SMBCLIENT_SHARENAME=' | sed 's/.*=//')
+	samba_clientusename=$(cat /DietPi/dietpi.txt | grep -m1 '^CONFIG_SMBCLIENT_USERNAME=' | sed 's/.*=//')
+	samba_clientpassword=$(cat /DietPi/dietpi.txt | grep -m1 '^CONFIG_SMBCLIENT_PASSWORD=' | sed 's/.*=//')
+
+	Apply_And_Mount(){
+
+		#NB: Convert spaces into '\040': https://github.com/Fourdee/DietPi/issues/1201#issuecomment-339720271
+		local space_to_040=$(echo -e "$samba_clientshare" | sed 's/ /\\\\040/g')
+
+		#Apply to fstab
+		sed -i "/\/mnt\/samba/c\\/\/$samba_clientname\/$space_to_040 \/mnt\/samba cifs username=$samba_clientusename,password=$samba_clientpassword,iocharset=utf8,sec=ntlm,nofail  0  0" /etc/fstab
+
+		#Mount up
+		mount -a
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Main Loop
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#-----------------------------------------------------------------------------------
+	#Menu
+	if (( $INPUT == 0 )); then
+		OPTION=$(whiptail --inputbox "Please enter the fileservers IP address\n - eg: 192.168.0.2" 9 65 "$samba_clientname" --title "Samba Client Setup" 3>&1 1>&2 2>&3)
+		CHOICE=$?
+		if (( $CHOICE == 0 )); then
+			samba_clientname=$OPTION
+
+			OPTION=$(whiptail --inputbox "Please enter the fileservers shared folder name\n - eg: MySharedFolder" 9 65 "$samba_clientshare" --title "Samba Client Setup" 3>&1 1>&2 2>&3)
+			CHOICE=$?
+			if (( $CHOICE == 0 )); then
+				samba_clientshare=$OPTION
+
+				#Username
+				OPTION=$(whiptail --inputbox "Please enter the fileservers username\n - eg: JoeBloggs" 9 65 "$samba_clientusename" --title "Samba Client Setup" 3>&1 1>&2 2>&3)
+				CHOICE=$?
+				if (( $CHOICE == 0 )); then
+					samba_clientusename=$OPTION
+
+					#Password
+					OPTION=$(whiptail --inputbox "Please enter the fileservers password\n - eg: LetMeIn\n - (NOTICE) This will be stored with no encryption" 10 65 "$samba_clientpassword" --title "Samba Client Setup" 3>&1 1>&2 2>&3)
+					CHOICE=$?
+					if (( $CHOICE == 0 )); then
+						samba_clientpassword=$OPTION
+
+						#Unmount if connected
+						clear
+						echo -e "\n\n Attempting mount, please wait...."
+						umount /mnt/samba &> /dev/null
+
+						#Save to Dietpi.txt
+						sed -i "/CONFIG_SMBCLIENT_COMPUTERNAME/c\CONFIG_SMBCLIENT_COMPUTERNAME=$samba_clientname" /DietPi/dietpi.txt
+						sed -i "/CONFIG_SMBCLIENT_SHARENAME/c\CONFIG_SMBCLIENT_SHARENAME=$samba_clientshare" /DietPi/dietpi.txt
+						sed -i "/CONFIG_SMBCLIENT_USERNAME/c\CONFIG_SMBCLIENT_USERNAME=$samba_clientusename" /DietPi/dietpi.txt
+						sed -i "/CONFIG_SMBCLIENT_PASSWORD/c\CONFIG_SMBCLIENT_PASSWORD=$samba_clientpassword" /DietPi/dietpi.txt
+
+						Apply_And_Mount
+					fi
+				fi
+			fi
+		fi
+
+	#-----------------------------------------------------------------------------------
+	#Apply and mount. Using settings from dietpi.txt
+	elif (( $INPUT == 1 )); then
+		Apply_And_Mount
+	fi
+
+	#-----------------------------------------------------------------------------------
+	exit
+	#-----------------------------------------------------------------------------------
+}

@@ -1,0 +1,529 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=samba
+pkgver=4.6.6
+pkgrel=1
+pkgdesc="Tools to access a server's filespace and printers via SMB"
+url="http://www.samba.org"
+arch="all"
+license="GPL3"
+subpackages="$pkgname-dev $pkgname-doc
+	$pkgname-common::noarch
+	$pkgname-initscript::noarch
+	$pkgname-common-tools:_common_tools
+	$pkgname-common-server-libs:_common_server_libs
+	$pkgname-common-libs:_common_libs
+	libsmbclient
+	$pkgname-client
+	$pkgname-client-libs:_client_libs
+
+	$pkgname-winbind
+	libwbclient
+	$pkgname-winbind-clients:_winbind_clients
+	$pkgname-winbind-krb5-locator:_winbind_krb5_locator
+	$pkgname-libnss-winbind:_libnss_winbind
+
+	$pkgname-heimdal-libs:_heimdal_libs
+	$pkgname-dc
+	$pkgname-dc-libs:_dc_libs
+
+	$pkgname-server
+	$pkgname-server-libs:_server_libs
+	$pkgname-pidl::noarch
+	py-$pkgname:_py
+	$pkgname-test:_test
+	$pkgname-libs-py:_libs_py
+	$pkgname-libs"
+
+depends="$pkgname-server=$pkgver-r$pkgrel
+	$pkgname-client=$pkgver-r$pkgrel
+	$pkgname-common-tools=$pkgver-r$pkgrel"
+
+# note that heimdal is required (over mit krb5) for AD DC functionality
+makedepends="popt-dev ncurses-dev openldap-dev e2fsprogs-dev
+	talloc-dev tdb-dev py-tdb ldb-dev<1.2 cups-dev python2-dev libcap-dev
+	tevent-dev py-tevent iniparser-dev perl subunit-dev docbook-xsl
+	libarchive-dev acl-dev"
+source="https://us1.samba.org/samba/ftp/stable/$pkgname-$pkgver.tar.gz
+	uclibc-xattr-create.patch
+	domain.patch
+	getpwent_r.patch
+	netdb-defines.patch
+	netapp.patch
+
+	$pkgname.initd
+	$pkgname.confd
+	$pkgname.logrotate
+	"
+pkggroups="winbind"
+builddir="$srcdir/$pkgname-$pkgver"
+
+# secfixes:
+#   4.6.1-r0:
+#     - CVE-2017-2619
+
+prepare() {
+	cd "$builddir"
+	default_prepare
+}
+
+build() {
+	cd "$builddir"
+	local _jobs=$JOBS
+	local _idmap_modules=idmap_ad,idmap_rid,idmap_adex,idmap_hash,idmap_tdb2
+	local _pdb_modules=pdb_tdbsam,pdb_ldap,pdb_ads,pdb_smbpasswd,pdb_wbc_sam,pdb_samba4
+	local _auth_modules=auth_unix,auth_wbc,auth_server,auth_netlogond,auth_script,auth_samba4
+
+	if [ -z "$_jobs" ]; then
+		_jobs=$(awk '/^core id/ {n++} END{print n}' /proc/cpuinfo)
+	fi
+	./configure --prefix=/usr \
+		--jobs=${_jobs:-2} \
+		--sysconfdir=/etc/$pkgname \
+		--with-configdir=/etc/$pkgname \
+		--localstatedir=/var \
+		--libexecdir=/usr/lib \
+		--enable-fhs \
+		--with-lockdir=/var/cache/$pkgname \
+		--with-piddir=/var/run/$pkgname \
+		--with-logfilebase=/var/log/$pkgname \
+		--without-pam \
+		--without-systemd \
+		--with-ads \
+		--with-shared-modules=$_idmap_modules,$_pdb_modules,$_auth_modules \
+		--enable-cups \
+		--without-gettext \
+		--bundled-libraries=NONE,ntdb,roken,wind,hx509,asn1,heimbase,hcrypto,krb5,gssapi,heimntlm,hdb,kdc,cmocka \
+		--disable-rpath-install \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+
+	install -d "$pkgdir"/var/log/$pkgname \
+		"$pkgdir"/usr/share/doc/$pkgname \
+		|| return 1
+	install -dm755 "$pkgdir"/var/lib/$pkgname/sysvol || return 1
+	install -Dm644 packaging/LSB/smb.conf \
+		"$pkgdir"/etc/$pkgname/smb.conf || return 1
+	install -Dm644 packaging/RHEL/setup/smbusers \
+		"$pkgdir"/etc/$pkgname/smbusers || return 1
+	install -m744 packaging/printing/smbprint \
+		"$pkgdir"/usr/bin/smbprint || return 1
+	install -Dm644 "$srcdir"/$pkgname.logrotate \
+		"$pkgdir"/etc/logrotate.d/$pkgname
+}
+
+initscript() {
+	pkgdesc="Init script for Samba"
+	depends=""
+	install -Dm755 $srcdir/$pkgname.initd "$subpkgdir"/etc/init.d/$pkgname
+	install -Dm644 $srcdir/$pkgname.confd "$subpkgdir"/etc/conf.d/$pkgname
+}
+
+_mv_files() {
+	local i
+	for i in "$@"; do
+		case $i in
+		*/*) mkdir -p "$subpkgdir"/${i%/*};;
+		*) mkdir -p "$subpkgdir";;
+		esac
+		mv "$pkgdir"/$i "$subpkgdir"/$i || return 1
+	done
+}
+
+common() {
+	pkgdesc="Samba common files for both client an servers"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		etc \
+		var \
+		|| return 1
+	install -d -m700 "$subpkgdir"/var/lib/$pkgname/private
+}
+
+# common-libs is an attempt to avoid libpython dependency for libsmbclient
+_libs_py() {
+	pkgdesc="Libraries that require libpython"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/$pkgname/libsamba-net-samba4.so \
+		usr/lib/$pkgname/libsamba-python-samba4.so \
+		|| return 1
+	return 0
+}
+
+_common_tools() {
+	pkgdesc="Tools for Samba servers and clients"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/bin/net \
+		usr/bin/pdbedit \
+		usr/bin/profiles \
+		usr/bin/smbcontrol \
+		usr/bin/smbpasswd \
+		usr/bin/testparm \
+		usr/lib/$pkgname/libgpo-samba4.so \
+		usr/lib/$pkgname/libnet-keytab-samba4.so \
+		|| return 1
+}
+
+_common_server_libs() {
+	pkgdesc="Samba libraries shared by common-tools and servers"
+	depends=""
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/libnetapi.so.* \
+		usr/lib/libsmbldap.so.* \
+		usr/lib/$pkgname/libads-samba4.so \
+		usr/lib/$pkgname/libauth-samba4.so \
+		usr/lib/$pkgname/libdfs-server-ad-samba4.so \
+		usr/lib/$pkgname/libnpa-tstream-samba4.so \
+		usr/lib/$pkgname/libprinting-migrate-samba4.so \
+		usr/lib/$pkgname/libsmbd-base-samba4.so \
+		usr/lib/$pkgname/libsmbd-conn-samba4.so \
+		usr/lib/$pkgname/libsmbldaphelper-samba4.so \
+		usr/lib/$pkgname/pdb \
+		|| return 1
+}
+
+_common_libs() {
+	pkgdesc="Samba libraries shared by common-tools, server and clients"
+	depends=""
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/$pkgname/libcli-spoolss-samba4.so \
+		usr/lib/$pkgname/libtrusts-util-samba4.so \
+		usr/lib/libdcerpc-binding.so.* \
+		usr/lib/libsamba-passdb.so.* \
+		usr/lib/$pkgname/libdcerpc-samba-samba4.so \
+		usr/lib/$pkgname/liblibcli-lsa3-samba4.so \
+		usr/lib/$pkgname/liblibcli-netlogon3-samba4.so \
+		usr/lib/$pkgname/liblibsmb-samba4.so \
+		usr/lib/$pkgname/libmsrpc3-samba4.so \
+		usr/lib/$pkgname/libndr-samba4.so \
+		|| return 1
+}
+
+libsmbclient() {
+	pkgdesc="The SMB client library"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/libsmbclient.so.* \
+		|| return 1
+}
+
+_client_libs() {
+	pkgdesc="Samba libraries used by clients"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/libdcerpc.so.* \
+		usr/lib/$pkgname/libcli-ldap-samba4.so \
+		usr/lib/$pkgname/libcmdline-credentials-samba4.so \
+		usr/lib/$pkgname/libdsdb-garbage-collect-tombstones-samba4.so \
+		usr/lib/$pkgname/libevents-samba4.so \
+		usr/lib/$pkgname/libhttp-samba4.so \
+		usr/lib/$pkgname/libnetif-samba4.so \
+		usr/lib/$pkgname/libregistry-samba4.so \
+		usr/lib/$pkgname/libsmbclient-raw-samba4.so \
+		|| return 1
+}
+
+client() {
+	pkgdesc="Samba client programs"
+	depends="$pkgname-common=$pkgver-r$pkgrel"
+	cd "$pkgdir"
+	_mv_files \
+		usr/bin/cifsdd \
+		usr/bin/findsmb \
+		usr/bin/dbwrap_tool \
+		usr/bin/mvxattr \
+		usr/bin/nmblookup \
+		usr/bin/oLschema2ldif \
+		usr/bin/regdiff \
+		usr/bin/regpatch \
+		usr/bin/regshell \
+		usr/bin/regtree \
+		usr/bin/rpcclient \
+		usr/bin/samba-regedit \
+		usr/bin/sharesec \
+		usr/bin/smbcacls \
+		usr/bin/smbclient \
+		usr/bin/smbcquotas \
+		usr/bin/smbget \
+		usr/bin/smbprint \
+		usr/bin/smbspool \
+		usr/bin/smbtar \
+		usr/bin/smbtree \
+		usr/lib/$pkgname/smbspool_krb5_wrapper \
+		|| return 1
+}
+
+_server_libs() {
+	pkgdesc="Samba libraries shared by server and windbind"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/$pkgname/libMESSAGING-samba4.so \
+		usr/lib/$pkgname/libdcerpc-samba4.so \
+		usr/lib/$pkgname/libidmap-samba4.so \
+		usr/lib/$pkgname/libnss-info-samba4.so \
+		\
+		usr/lib/$pkgname/libnon-posix-acls-samba4.so \
+		|| return 1
+}
+
+
+winbind() {
+	pkgdesc="Samba user and group resolver"
+	depends="$pkgname-common=$pkgver-r$pkgrel"
+	install="winbind.pre-install winbind.pre-upgrade winbind.post-install
+		winbind.post-upgrade"
+	cd "$pkgdir"
+	_mv_files \
+		usr/sbin/winbindd \
+		usr/lib/$pkgname/idmap \
+		usr/lib/$pkgname/nss_info \
+		|| return 1
+	install -d -g winbind -m 750 \
+		"$subpkgdir"/var/cache/$pkgname/winbindd_privileged
+}
+
+libwbclient() {
+	pkgdesc="Samba winbind client libraries"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/libwbclient.so.* \
+		usr/lib/$pkgname/libreplace-samba4.so \
+		usr/lib/$pkgname/libwinbind-client-samba4.so \
+		|| return 1
+}
+
+_winbind_clients() {
+	pkgdesc="Samba winbind client tools"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/bin/ntlm_auth \
+		usr/bin/wbinfo \
+		|| return 1
+}
+
+_libnss_winbind() {
+	pkgdesc="Samba winbind NSS plugin"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/libnss_winbind.so* \
+		usr/lib/libnss_wins.so* \
+		|| return 1
+}
+
+_winbind_krb5_locator() {
+	pkgdesc="Samba winbind krb5 locator"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/winbind_krb5_locator.so \
+		|| return 1
+}
+
+dc() {
+	pkgdesc="Samba AD Domain Controller"
+	depends="$pkgname-common=$pkgver-r$pkgrel
+		$pkgname-server=$pkgver-r$pkgrel
+		$pkgname-winbind=$pkgver-r$pkgrel
+		py-$pkgname=$pkgver-r$pkgrel"
+	cd "$pkgdir"
+	_mv_files \
+		usr/bin/samba-tool \
+		usr/sbin/samba* \
+		usr/share/$pkgname \
+		usr/lib/$pkgname/auth/samba4.so \
+		usr/lib/$pkgname/gensec \
+		usr/lib/$pkgname/ldb \
+		usr/lib/$pkgname/libsmbpasswdparser-samba4.so \
+		usr/lib/$pkgname/vfs/posix_eadb.so
+}
+
+_dc_libs() {
+	pkgdesc="Samba AD Domain Controller libraries"
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/libdcerpc-samr.so.* \
+		usr/lib/libdcerpc-server.so.* \
+		usr/lib/libsamba-policy.so.* \
+		usr/lib/$pkgname/bind9 \
+		usr/lib/$pkgname/libHDB-SAMBA4-samba4.so \
+		usr/lib/$pkgname/libLIBWBCLIENT-OLD-samba4.so \
+		usr/lib/$pkgname/libauth-unix-token-samba4.so \
+		usr/lib/$pkgname/libauth4-samba4.so \
+		usr/lib/$pkgname/libcluster-samba4.so \
+		usr/lib/$pkgname/libdb-glue-samba4.so \
+		usr/lib/$pkgname/libdnsserver-common-samba4.so \
+		usr/lib/$pkgname/libdsdb-module-samba4.so \
+		usr/lib/$pkgname/libhdb-samba4.so.* \
+		usr/lib/$pkgname/libkdc-samba4.so.* \
+		usr/lib/$pkgname/libpac-samba4.so \
+		usr/lib/$pkgname/libposix-eadb-samba4.so \
+		usr/lib/$pkgname/libprocess-model-samba4.so \
+		usr/lib/$pkgname/libservice-samba4.so \
+		usr/lib/$pkgname/libshares-samba4.so \
+		usr/lib/$pkgname/process_model \
+		usr/lib/$pkgname/service
+}
+
+_heimdal_libs() {
+	pkgdesc="Samba heimdal libraries"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/$pkgname/libasn1-samba4.so.* \
+		usr/lib/$pkgname/libgssapi-samba4.so.* \
+		usr/lib/$pkgname/libhcrypto-samba4.so.* \
+		usr/lib/$pkgname/libheimbase-samba4.so.* \
+		usr/lib/$pkgname/libheimntlm-samba4.so.* \
+		usr/lib/$pkgname/libhx509-samba4.so.* \
+		usr/lib/$pkgname/libkrb5-samba4.so.* \
+		usr/lib/$pkgname/libroken-samba4.so.* \
+		usr/lib/$pkgname/libwind-samba4.so.*
+}
+
+server() {
+	pkgdesc="Samba server"
+	depends="$pkgname-common=$pkgver-r$pkgrel
+		$pkgname-initscript=$pkgver-r$pkgrel"
+	cd "$pkgdir"
+	_mv_files \
+		usr/sbin/nmbd \
+		usr/sbin/smbd \
+		usr/bin/eventlogadm \
+		usr/bin/smbstatus \
+		\
+		usr/lib/$pkgname/auth \
+		usr/lib/$pkgname/libxattr-tdb-samba4.so \
+		usr/lib/$pkgname/vfs \
+		|| return 1
+}
+
+
+pidl() {
+	pkgdesc="Perl IDL compiler"
+	depends="perl"
+	cd "$pkgdir"
+	_mv_files \
+		usr/bin/pidl \
+		usr/share/perl* \
+		|| return 1
+}
+
+_py() {
+	pkgdesc="Samba python libraries"
+	depends="py-tdb"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/python* "$subpkgdir"/usr/lib/
+}
+
+_test() {
+	pkgdesc="Samba server and client testing tools"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/bin/gentest \
+		usr/bin/locktest \
+		usr/bin/masktest \
+		usr/bin/ndrdump \
+		usr/bin/smbtorture \
+		usr/lib/$pkgname/libdlz-bind9-for-torture-samba4.so \
+		usr/lib/$pkgname/libtorture-samba4.so \
+		|| return 1
+}
+
+libs() {
+	pkgdesc="Samba core libraries"
+	depends=
+	cd "$pkgdir"
+	_mv_files \
+		usr/lib/libndr-krb5pac.so.* \
+		usr/lib/libndr-nbt.so.* \
+		usr/lib/libndr-standard.so.* \
+		usr/lib/libndr.so.* \
+		usr/lib/libsamba-credentials.so.* \
+		usr/lib/libsamba-errors.so.* \
+		usr/lib/libsamba-hostconfig.so.* \
+		usr/lib/libsamba-util.so.* \
+		usr/lib/libsamdb.so.* \
+		usr/lib/libsmbconf.so.* \
+		usr/lib/libtevent-util.so.* \
+		usr/lib/$pkgname/libCHARSET3-samba4.so \
+		usr/lib/$pkgname/libaddns-samba4.so \
+		usr/lib/$pkgname/libasn1util-samba4.so \
+		usr/lib/$pkgname/libauth-sam-reply-samba4.so \
+		usr/lib/$pkgname/libauthkrb5-samba4.so \
+		usr/lib/$pkgname/libcli-cldap-samba4.so \
+		usr/lib/$pkgname/libcli-ldap-common-samba4.so \
+		usr/lib/$pkgname/libcli-nbt-samba4.so \
+		usr/lib/$pkgname/libcli-smb-common-samba4.so \
+		usr/lib/$pkgname/libcliauth-samba4.so \
+		usr/lib/$pkgname/libdbwrap-samba4.so \
+		usr/lib/$pkgname/libflag-mapping-samba4.so \
+		usr/lib/$pkgname/libgenrand-samba4.so \
+		usr/lib/$pkgname/libgensec-samba4.so \
+		usr/lib/$pkgname/libgse-samba4.so \
+		usr/lib/$pkgname/libinterfaces-samba4.so \
+		usr/lib/$pkgname/libiov-buf-samba4.so \
+		usr/lib/$pkgname/libkrb5samba-samba4.so \
+		usr/lib/$pkgname/libldbsamba-samba4.so \
+		usr/lib/$pkgname/libmessages-dgm-samba4.so \
+		usr/lib/$pkgname/libmessages-util-samba4.so \
+		usr/lib/$pkgname/libmsghdr-samba4.so \
+		usr/lib/$pkgname/libndr-samba-samba4.so \
+		usr/lib/$pkgname/libpopt-samba3-samba4.so \
+		usr/lib/$pkgname/libsamba-cluster-support-samba4.so \
+		usr/lib/$pkgname/libsamba-debug-samba4.so \
+		usr/lib/$pkgname/libsamba-modules-samba4.so \
+		usr/lib/$pkgname/libsamba-security-samba4.so \
+		usr/lib/$pkgname/libsamba-sockets-samba4.so \
+		usr/lib/$pkgname/libsamba3-util-samba4.so \
+		usr/lib/$pkgname/libsamdb-common-samba4.so \
+		usr/lib/$pkgname/libsecrets3-samba4.so \
+		usr/lib/$pkgname/libserver-id-db-samba4.so \
+		usr/lib/$pkgname/libserver-role-samba4.so \
+		usr/lib/$pkgname/libsmb-transport-samba4.so \
+		usr/lib/$pkgname/libsmbd-shim-samba4.so \
+		usr/lib/$pkgname/libsocket-blocking-samba4.so \
+		usr/lib/$pkgname/libsys-rw-samba4.so \
+		usr/lib/$pkgname/libtalloc-report-samba4.so \
+		usr/lib/$pkgname/libtdb-wrap-samba4.so \
+		usr/lib/$pkgname/libtime-basic-samba4.so \
+		usr/lib/$pkgname/libutil-cmdline-samba4.so \
+		usr/lib/$pkgname/libutil-reg-samba4.so \
+		usr/lib/$pkgname/libutil-setid-samba4.so \
+		usr/lib/$pkgname/libutil-tdb-samba4.so \
+		|| return 1
+	# exit with error if some stuff stayed at main pack
+	rmdir "$pkgdir"/usr/lib/$pkgname \
+		"$pkgdir"/usr/share \
+		"$pkgdir"/usr/sbin \
+		"$pkgdir"/usr/bin \
+		"$pkgdir"/usr/lib \
+		"$pkgdir"/usr
+}
+
+sha512sums="e06bdc83f44c449212f2e45a902e2ca547505a75e970166259b91d2093fb442cdfd456e724d0e842b674b4b8d5bdbe9072996d768c08ebd979a44b2494a59799  samba-4.6.6.tar.gz
+b43809d7ecbf3968f5154c2ded6ed47dae36921f1895ea98bcce50557eb2ad39b736345ffb4214655ed3154c143c20431d248cde828285380bafbf4d2627df9b  uclibc-xattr-create.patch
+62d373dbaee75121a1d73f2c09cdca7239705808ff807b171d1d5a28fd4ffc66bdb52494b62786d7aaba8aeece5c08433b532ca96a28d712452fe9daac8d8d2e  domain.patch
+0d4fd9862191554dc9c724cec0b94fd19afbfd0c4ed619e4c620c075e849cb3f3d44db1e5f119d890da23a3dd0068d9873703f3d86c47b91310521f37356208b  getpwent_r.patch
+1854577d0e4457e27da367a6c7ec0fb5cfd63cefea0a39181c9d6e78cf8d3eb50878cdddeea3daeec955d00263151c2f86ea754ff4276ef98bc52c0276d9ffe8  netdb-defines.patch
+202667cb0383414d9289cd67574f5e1140c9a0ff63bb82a746a59b2397a00db15654bfb30cb5ec1cd68a097899be0f849d9aab4c0d210152386c9e66c640f0c0  netapp.patch
+6bee83aab500f27248b315d8a5f567940d7232269b021d801b3d51c20ed9e4aad513ee0117f356fb388014a63a145beacb55307ef9addbf7997987304b548fcf  samba.initd
+4faf581ecef3ec38319e3c4ab6d3995c51fd7ba83180dc5553a2ff4dfb92efadb43030c543292130c4ed0c281dc0972c6973d52d48062c5edb39bb1c4bbb6dd6  samba.confd
+f88ebe59ca3a9e9b77dd5993c13ef3e73a838efb8ed858088b464a330132d662f33e25c27819e38835389dee23057a3951de11bae1eef55db8ff5e1ec6760053  samba.logrotate"

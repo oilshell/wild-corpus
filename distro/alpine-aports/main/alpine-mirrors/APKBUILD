@@ -1,0 +1,45 @@
+# Contributor: Matt Smith <mcs@darkregion.net>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=alpine-mirrors
+pkgver=3.5.3
+pkgrel=0
+pkgdesc="List of Alpine Linux Mirrors"
+url="http://alpinelinux.org/"
+arch="noarch"
+license="MIT"
+depends=""
+makedepends="curl"
+install=""
+subpackages=""
+source="mirrors.yaml"
+
+build() {
+	cd "$srcdir"
+	awk '$1 == "-" && $2 ~ /^http:/ {print $2}' mirrors.yaml > MIRRORS.txt
+}
+
+check() {
+	cd "$srcdir"
+	local failed=""
+	for i in $(cat MIRRORS.txt); do
+		msg "testing $i"
+		curl --head --connect-timeout 10 $i >/dev/null \
+			|| failed="$failed $i"
+	done
+	if [ -n "$failed" ]; then
+		error "Following mirrors failed:"
+		for i in $failed; do
+			echo $i
+		done
+		return 1
+	fi
+}
+
+package() {
+	install -D -m644 "$srcdir"/mirrors.yaml \
+		"$pkgdir"/usr/share/alpine-mirrors/mirrors.yaml || return 1
+	install -D -m644 "$srcdir"/MIRRORS.txt \
+		"$pkgdir"/usr/share/alpine-mirrors/MIRRORS.txt || return 1
+}
+
+sha512sums="385e7ad17e96ed2a356d88fa707c08ffd824e86295e288a4eb956b19b3ec297bfe5ccf6c8378231b504b476ee2778b10b0ff77645cc80b04e55bb5632cba58db  mirrors.yaml"

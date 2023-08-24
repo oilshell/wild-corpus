@@ -1,0 +1,40 @@
+# Contributor: August Klein <amatcoder@gmail.com>
+# Maintainer: August Klein <amatcoder@gmail.com>
+pkgname=viewnior
+pkgver=1.6
+pkgrel=0
+pkgdesc="A fast and simple image viewer"
+url="http://siyanpanayotov.com/project/viewnior"
+arch="all"
+license="GPL3"
+depends=""
+makedepends="autoconf automake gnome-common gtk+2.0-dev exiv2-dev libtool"
+subpackages="$pkgname-lang $pkgname-doc"
+source="https://github.com/xsisqox/Viewnior/archive/$pkgname-$pkgver.tar.gz"
+
+builddir="$srcdir"/Viewnior-$pkgname-$pkgver
+
+prepare() {
+	cd "$builddir"
+	./autogen.sh || return 1
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+md5sums="f7d497360c48ce4bce09328d934cc4a4  viewnior-1.6.tar.gz"
+sha256sums="89013f6d30c1c121d8cb6327d3ffc35a757fba1d777c24849d632afe244e60a0  viewnior-1.6.tar.gz"
+sha512sums="4b150078573bfd3b8c5863d73087a51cd3b7ed5781e26c842fab44eec3e67ea9aea3feba064538578878df1ccb386525a6a84362dae7f92315fb7de735ace617  viewnior-1.6.tar.gz"

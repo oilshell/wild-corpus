@@ -1,0 +1,45 @@
+# Maintainer: Peter Bui <pnutzh4x0r@gmail.com>
+pkgname=py-vobject
+_pkgname=vobject
+pkgver=0.9.5
+pkgrel=0
+pkgdesc="Module for parsing and generating vCard and vCalendar files"
+url="http://eventable.github.io/vobject/"
+arch="noarch"
+license="Apache"
+depends="py-dateutil py-icu"
+makedepends="python2-dev py-setuptools python3-dev"
+subpackages="py3-${pkgname#py-}:_py3 py2-${pkgname#py-}:_py2"
+source="$pkgname-$pkgver.tar.gz::https://github.com/eventable/$_pkgname/archive/$pkgver.tar.gz"
+builddir="$srcdir"/$_pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+sha512sums="087b394ad6c48c359ee1cabb90cbc85cb305ed9e65199f33c19f386c7075b70273e5fddcf7fde5356b140ead7a581efd917594e4d493e720c4e1a632f797acc7  py-vobject-0.9.5.tar.gz"

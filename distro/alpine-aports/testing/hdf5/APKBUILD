@@ -1,0 +1,60 @@
+# Contributor: Isaac Dunham <ibid.ag@gmail.com>
+# Maintainer:
+#
+# HDF5 depends on zlib and provides a C interface by default.
+# Optionally, it can be built with szip (which has limitations on
+# commercial use and thus is non-free), MPI, and C++ and Fortran bindings.
+# C++ and Fortran bindings may not be thread-safe:
+# building either and passing --enable-threadsafe is unsupported.
+# Additionally, the 'high-level' bindings are incompatible with threadsafe
+# builds, due to inadequate locking.
+
+pkgname=hdf5
+pkgver=1.8.19
+pkgrel=0
+pkgdesc="HDF5 is a data model, library, and file format for storing and managing data"
+url="http://www.hdfgroup.org/HDF5/"
+arch="all"
+license="custom"
+depends_dev="zlib-dev"
+makedepends="$depends_dev"
+subpackages="$pkgname-dev $pkgname-doc"
+source="http://www.hdfgroup.org/ftp/HDF5/current18/src/$pkgname-$pkgver.tar.bz2"
+
+builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	default_prepare
+	update_config_sub
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--disable-threadsafe \
+		--enable-cxx \
+		--enable-direct-vfd
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	install -d "$pkgdir"/usr/share/licenses/"$pkgname"
+	install -c -m 0644 COPYING "$pkgdir"/usr/share/licenses/"$pkgname"/COPYING
+}
+
+dev() {
+	mkdir -p "$subpkgdir"/usr/share
+	mv "$pkgdir"/usr/share/hdf5_examples/ "$subpkgdir"/usr/share
+	default_dev
+}
+
+sha512sums="f4eccebbeb27d4b33c4aed4d040c9c83328b3d347a0fcf0bd74f3fd9ab988eb1473f1d69a8e34312df345988d3ba4e192624c8d6ad3ffbd3e456205f981ad90c  hdf5-1.8.19.tar.bz2"

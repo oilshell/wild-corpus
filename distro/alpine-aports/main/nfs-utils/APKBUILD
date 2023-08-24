@@ -1,0 +1,104 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=nfs-utils
+pkgver=2.1.1
+_basever=$pkgver
+pkgrel=4
+pkgdesc="kernel-mode NFS"
+url="http://nfs.sourceforge.net/"
+arch="all"
+license="GPL"
+depends="rpcbind"
+options="suid"
+makedepends="util-linux-dev libtirpc-dev libcap-dev libevent-dev
+	libnfsidmap-dev keyutils-dev lvm2-dev krb5-dev sqlite-dev
+	autoconf automake libtool bsd-compat-headers"
+subpackages="$pkgname-doc $pkgname-dbg rpcgen"
+
+source="http://downloads.sourceforge.net/nfs/$pkgname-$_basever.tar.bz2
+	0011-exportfs-only-do-glibc-specific-hackery-on-glibc.patch
+
+	nfs-utils-mtab-sym.patch
+	musl-getservbyport.patch
+	idmapd-dnotify-to-inotify.patch
+
+	nfs.initd
+	nfsmount.initd
+	nfsmount.confd
+	rpc.gssd.initd
+	rpc.idmapd.initd
+	rpc.pipefs.initd
+	rpc.statd.initd
+	rpc.svcgssd.initd
+	nfs.confd
+	nfs.exports
+	nfsclient.initd
+	nfsclient.confd
+	"
+
+builddir="$srcdir/$pkgname-$_basever"
+
+prepare() {
+	default_prepare
+	cd $builddir
+	./autogen.sh
+}
+
+build() {
+	cd $builddir
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--without-tcp-wrappers \
+		--enable-ipv6 \
+		--enable-nfsv4 \
+		--enable-uuid \
+		--enable-gss \
+		--enable-libmount-mount
+	make
+}
+
+package() {
+	cd $builddir
+	make -j1 DESTDIR="$pkgdir" install
+	install -Dm644 "$srcdir"/nfs.exports "$pkgdir"/etc/exports
+	mv "$pkgdir"/usr/sbin/rpc.statd "$pkgdir"/sbin/
+
+	local file=
+	for file in $source; do
+		case "${file}" in
+		*.confd) install -Dm644 "$srcdir"/"$file" \
+			"$pkgdir"/etc/conf.d/${file%.*} ;;
+		*.initd) install -Dm755 "$srcdir"/"$file" \
+			"$pkgdir"/etc/init.d/${file%.*} ;;
+		esac
+	done
+}
+
+rpcgen() {
+	pkgdesc="Remote Procedure Call (RPC) protocol compiler"
+	install -Dm755 "$builddir"/tools/rpcgen/rpcgen \
+		"$subpkgdir"/usr/bin/rpcgen
+}
+
+sha512sums="ed358280b7e124154632040bf747f6e4c3c6e4156bf90e82ff6915b1488f1c0dd65251a3a0f9b7ca96b9664d64e24b379828da9b524e64a3c769a44f4c930448  nfs-utils-2.1.1.tar.bz2
+9561a979a2313f00c0bbb2ffb3193ca089e5de2f15cf5b6c142e65e04a9401bbc962e490e5b1de026750262a05e5258b286a79781444e7f2ac6bd581b426211a  0011-exportfs-only-do-glibc-specific-hackery-on-glibc.patch
+5fd9039a61a0cdaeb57b5332ea545034101e6f15be200b7cf8fc7d0a3d22836a6fc778e0560656c1825808a4dc09046d9923d81b4d1324a6e526b226c657d064  nfs-utils-mtab-sym.patch
+a14fc747cc75f65bb206b28eb4f838ae85687c917893531318d3991adc3ed9914316b97fc507bf34881855c9978ad9d4617f33e464d1a0d746a65b31177687c1  musl-getservbyport.patch
+33410c469348adf5e6b5ec91d8cda6b246f1a38a0b234a52f54a49ab8395ede43dfedd58914a59c342923ba45722f6fd4e4aebeffbe4a730f31c9d1ad19de9a9  idmapd-dnotify-to-inotify.patch
+f7feb79cfcab0478affb640d1e5ad059757c88d51cc790fd54cde2fd7ed2e3cfd8f7f4c2de993d99da03e8ce3bdfb2750a4cb997b850fe33d0ef76d9b91c9018  nfs.initd
+89259b9f0878658d48792b5b2f42b43c966ed098dba1fecf9e07fb0de4aab37ad67655ea8dbcc2361ddab2b5013b2de35a03048a513aaeedf790e4b416a35a54  nfsmount.initd
+6e23897885cc33c49d9c7353b456585a1e0c7300822edba81bc48ba4ccc18297adce137260cc0aa9487aa5ef0aab3eecf931532cfa5bd40fd03bc9e0ddacfb28  nfsmount.confd
+d9d7eeebbe153d3c4784112ed6d50734b5619b3315bb1454f8163de2b78ed8f958029a0e1088de58e9b1b8069184aeab2c8f19af4b957b6be25e4f138960aeac  rpc.gssd.initd
+f3e88038cb040ffcbca76166f4322d37e39da00d144bc0a17aed4467ab10c6e626fcde6c407d0911d135bfab55622ad2e38ed93788b11459c5882ce60577fb45  rpc.idmapd.initd
+3d3fa6e7ae01e27d27d88aba1e307c5293dd1cbc9d555737e03c4f1e17988518f4f1e7f7a38a7337f8e8961e8378cc4611769b04db7368460589a3b218ac6d6b  rpc.pipefs.initd
+7f6baea852fff91b88e15e432ba19f9da0a3e3510b6f550b553912cf3887ce176280367b62bcce2a044730a075e4c1f6d7df1a669556d42725dea6e6e8e967ac  rpc.statd.initd
+819cce4ae0a0f26bc74ce546e149b98420584240a594c9bb4a0a49413750320bde050866f3753c499425ea8d8df094211fb1f7e020ce281791e1933e1bc6a47f  rpc.svcgssd.initd
+bc11b073735ee86c96b9c249ee187f4d16329c279a4e26760875059d2b5fa1d510ef3e4df5ee9dfb2a3133d755e1eb5c323d2fadc432a0cf630191ec353ac535  nfs.confd
+70f96bb3a465ee0fa857a6e511051ca3ced9f5a5d1e6b8b32eec843a2067f2475d8979c724a3661de0a2b078eef143f55d75ed184d823841d9de5038da91fb91  nfs.exports
+85078e2cd38b37a1e6fbaf0e40cf7690f403e71d9c8188d542d12fe56bfc02a49763c7bcc7742691754acc37928468c215db2795bebc29a5dfb052ba08f407bb  nfsclient.initd
+f12e67728ac4e76357685e2fe38bd7f6fcd90064165758ffeca145e6962ac44d4ff9d8d57e18cc6925a6ada8e95ad8321e9fc355931a804dd455aae1e4850e92  nfsclient.confd"

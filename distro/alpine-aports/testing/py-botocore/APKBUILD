@@ -1,0 +1,49 @@
+# Maintainer: Valery Kartel <valery.kartel@gmail.com>
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+pkgname=py-botocore
+pkgver=1.7.17
+pkgrel=0
+_pkgreal=${pkgname#py-}
+pkgdesc="The low-level, core functionality of Boto3"
+url="https://github.com/boto/botocore"
+arch="noarch"
+license="ASL 2.0"
+options="!check"
+depends="py-dateutil py-jmespath"
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="py3-$_pkgreal:_py3 py2-$_pkgreal:_py2"
+source="https://files.pythonhosted.org/packages/source/${_pkgreal:0:1}/$_pkgreal/$_pkgreal-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgreal-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+	python3 setup.py build
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	depends="${depends//py-/py2-}"
+	_py python2
+}
+
+_py3() {
+	depends="${depends//py-/py3-}"
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+sha512sums="73ab9166bdc5f9c599364516ae95473bc4e40f591bed1f3d7369c1df4cc74dc0738f3a3d7a5f560bcdacb7d86635c5ab09abc7b08dbe9bbdaa013ee528e9bea4  botocore-1.7.17.tar.gz"

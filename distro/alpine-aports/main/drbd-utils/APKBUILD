@@ -1,0 +1,55 @@
+# Contributor: Leonardo Arena <rnalrd@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=drbd-utils
+pkgver=9.1.0
+pkgrel=0
+pkgdesc="Network-based RAID 1"
+url="http://www.drbd.org"
+arch="all"
+license="GPL"
+depends="bash"
+makedepends="bash bison flex linux-headers libxslt docbook-xsl"
+provides="drbd"
+subpackages="$pkgname-doc $pkgname-pacemaker::noarch"
+source="https://links.linbit.com/sources/drbd/utils/drbd-utils-$pkgver.tar.gz
+	drbdsetup-permissions.patch
+	drbd.initd"
+
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure --prefix=/usr \
+		--sbindir=/sbin \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--with-pacemaker \
+		--with-drbdmon \
+		--without-udev \
+		--without-heartbeat \
+		--without-rgmanager \
+		--without-xen \
+		--without-bashcompletion\
+		--without-83support
+
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+        install -m755 -D "$srcdir/drbd.initd" \
+		"$pkgdir/etc/init.d/drbd"
+}
+
+pacemaker() {
+	depends="drbd"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/ocf "$subpkgdir"/usr/lib
+}
+
+sha512sums="dc4b36f76404cfcff2cadacb672e2a3bee923521febc5c5d481b633d8ce4220345c9ae80e4664b94c0064e7429dfcfc294eb6a3d2b3417ff950f3230e58dbb51  drbd-utils-9.1.0.tar.gz
+562ae8eee03148666fb6e6e700c1eb9086f6901e176ea6cd007e3ac4e39d1cdaf967064de74dc1ad620155996dc7011bd0e2abd1c9595ff9bf5f4413673726f3  drbdsetup-permissions.patch
+bb465e32273aaba0b86ae681bc94c58bb51f542221f51ced197e22b316ce1bc9a0b4fe1f43af07ef13b3f0946466a43218f0a2ab7f4210adbb00174a503b64d7  drbd.initd"

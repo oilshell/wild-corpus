@@ -1,0 +1,499 @@
+#!/bin/bash
+{
+	#////////////////////////////////////
+	# DietPi Function:
+	# - Enables control and applies settings for specific software and configs.
+	#
+	#////////////////////////////////////
+	# Created by Daniel Knight / daniel.knight@dietpi.com / dietpi.com
+	#
+	#////////////////////////////////////
+	#
+	# Usage:
+	#
+	FP_SCRIPT='/DietPi/dietpi/func/dietpi-set_software'
+	AVAIABLE_COMMANDS="
+Available commands
+$FP_SCRIPT			locale					en_GB.UTF-8
+$FP_SCRIPT			allo					eth_dhcp / eth_static
+$FP_SCRIPT			useradd					X=create user with name X and default permissions, using global DietPi password (dietpi)
+$FP_SCRIPT			userdel					X=delete user with name X
+$FP_SCRIPT			apt-mirror				url/default
+$FP_SCRIPT			ntpd-mode				configures NTPD mode (eg: ntp/systemd)
+$FP_SCRIPT			verify_dietpi.txt		verifies dietpi.txt entries, adds missing entries if required
+"
+	#////////////////////////////////////
+
+	#Grab inputs
+	INPUT_MODE_NAME="$1"
+	INPUT_MODE_VALUE="$2"
+
+	INPUT_ADDITIONAL_1="$3"
+	INPUT_ADDITIONAL_2="$4"
+	INPUT_ADDITIONAL_3="$5"
+	INPUT_ADDITIONAL_4="$6"
+
+	#Import DietPi-Globals ---------------------------------------------------------------
+	. /DietPi/dietpi/func/dietpi-globals
+	G_CHECK_ROOT_USER
+	G_CHECK_ROOTFS_RW
+	export G_PROGRAM_NAME='DietPi-Set_software'
+	#Import DietPi-Globals ---------------------------------------------------------------
+
+	EXIT_CODE=0
+
+	Unknown_Input_Name(){
+
+		EXIT_CODE=1
+		G_DIETPI-NOTIFY 2 "Unknown input name ($INPUT_MODE_NAME). Nothing has been applied."
+		echo -e "$AVAIABLE_COMMANDS"
+
+	}
+
+	Unknown_Input_Mode(){
+
+		EXIT_CODE=1
+		G_DIETPI-NOTIFY 2 "Unknown input value ($INPUT_MODE_VALUE). Nothing has been applied."
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# locale
+	# NB: auto installs en_GB.UTF-8 alongside any input option
+	#/////////////////////////////////////////////////////////////////////////////////////
+	Locale_Main(){
+
+		if [ -n "$INPUT_MODE_VALUE" ]; then
+
+			cat << _EOF_ > /etc/locale.gen
+$INPUT_MODE_VALUE UTF-8
+en_GB.UTF-8 UTF-8
+_EOF_
+			G_RUN_CMD dpkg-reconfigure -f noninteractive locales
+
+			# - and force locale for remote access, especially dropbear, where receiving locale from client can't be suppressed:
+			cat << _EOF_ > /etc/profile.d/99-dietpi-force-locale.sh
+# To force server locales on SSH access, as dropbear does automatically overwrite them by client values:
+export LANG=$INPUT_MODE_VALUE
+export LC_ALL=$INPUT_MODE_VALUE
+export LANGUAGE=$( echo $INPUT_MODE_VALUE | sed 's/\..*//' ):$( echo $INPUT_MODE_VALUE | sed 's/_.*//' )
+_EOF_
+			chmod +x /etc/profile.d/99-dietpi-force-locale.sh
+
+			sed -i "/AUTO_SETUP_LOCALE=/c\AUTO_SETUP_LOCALE=$INPUT_MODE_VALUE" /DietPi/dietpi.txt
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Set Apt Mirror
+	#/////////////////////////////////////////////////////////////////////////////////////
+	AptMirror_Main(){
+
+		if [ -n "$INPUT_MODE_VALUE" ]; then
+
+			# - Set defaults?
+			if [ "$INPUT_MODE_VALUE" = "default" ]; then
+
+				if (( $G_HW_MODEL < 10 )); then
+
+					INPUT_MODE_VALUE='https://www.mirrorservice.org/sites/archive.raspbian.org/raspbian'
+
+				else
+
+					INPUT_MODE_VALUE='https://deb.debian.org/debian/'
+
+				fi
+
+			fi
+
+			# - Set raspbian
+			if (( $G_HW_MODEL < 10 )); then
+
+				cat << _EOF_ > /etc/apt/sources.list
+deb $INPUT_MODE_VALUE $G_DISTRO_NAME main contrib non-free rpi
+_EOF_
+
+				cat << _EOF_ > /etc/apt/sources.list.d/raspi.list
+deb https://archive.raspberrypi.org/debian/ $G_DISTRO_NAME main ui
+_EOF_
+
+				#	Update dietpi.txt entry
+				sed -i "/CONFIG_APT_RASPBIAN_MIRROR=/c\CONFIG_APT_RASPBIAN_MIRROR=$INPUT_MODE_VALUE" /DietPi/dietpi.txt
+
+			# - Set debian
+			else
+
+				cat << _EOF_ > /etc/apt/sources.list
+deb $INPUT_MODE_VALUE $G_DISTRO_NAME main contrib non-free
+deb $INPUT_MODE_VALUE $G_DISTRO_NAME-updates main contrib non-free
+deb https://deb.debian.org/debian-security/ $G_DISTRO_NAME/updates main contrib non-free
+deb $INPUT_MODE_VALUE $G_DISTRO_NAME-backports main contrib non-free
+_EOF_
+
+				#	Jessie, switch deb.debian.org to http: https://github.com/Fourdee/DietPi/issues/1285#issuecomment-351830101
+				if (( $G_DISTRO < 4 )); then
+
+					sed -i 's|https://deb.debian.org|http://deb.debian.org|g' /etc/apt/sources.list
+
+				#	Buster, remove backports: https://github.com/Fourdee/DietPi/issues/1285#issuecomment-351830101
+				elif (( $G_DISTRO > 4 )); then
+
+					sed -i '/backports/d' /etc/apt/sources.list
+
+				fi
+
+				#	Update dietpi.txt entry
+				sed -i "/CONFIG_APT_DEBIAN_MIRROR=/c\CONFIG_APT_DEBIAN_MIRROR=$INPUT_MODE_VALUE" /DietPi/dietpi.txt
+
+			fi
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Set NTPD Mode
+	# NB: also sets mirror as defined in dietpi.txt CONFIG_NTP_MIRROR
+	# NB: Also restarts NTP updates and waits for them to complete
+	#/////////////////////////////////////////////////////////////////////////////////////
+	NtpdMode_Main(){
+
+		if [ -n "$INPUT_MODE_VALUE" ]; then
+
+			# - Reset global to disabled, prevents run_ntpd in dietpi-software
+			sed -i "/CONFIG_NTP_MODE=/c\CONFIG_NTP_MODE=0" /DietPi/dietpi.txt
+
+			#	Kill all existing ntp
+			killall -w /DietPi/dietpi/func/run_ntpd &> /dev/null
+			killall -w ntpd &> /dev/null
+			rm /var/lib/dietpi/.ntpd_exit_status &> /dev/null
+
+			local ntpd_mirror=$(grep -m1 '^CONFIG_NTP_MIRROR=' /DietPi/dietpi.txt | sed 's/.*=//')
+			# - Set defaults?
+			if [ "$ntpd_mirror" = "default" ]; then
+
+				ntpd_mirror='debian.pool.ntp.org'
+
+			fi
+
+			#Install ntp if required
+			if (( $INPUT_MODE_VALUE >= 1 && $INPUT_MODE_VALUE <= 3 )); then
+
+				# - avoid dpsoftware install if system first run is not completed
+				if (( $G_DIETPI_INSTALL_STAGE >= 0 )); then
+
+					/DietPi/dietpi/dietpi-software install 170
+
+				fi
+
+				# - Set NTPD mirror
+				#   - Remove obsolete 'server' entries.
+				sed -i '/^[[:blank:]#;]*server [0-9]/d' /etc/ntp.conf
+				for ((i=0; i<4; i++)) do
+
+					if grep "^[[:blank:]]*pool $i" /etc/ntp.conf; then
+
+						sed -i "s/^[[:blank:]]*pool $i.*/pool $i.$ntpd_mirror iburst/" /etc/ntp.conf
+
+					elif grep "^[[:blank:]#;]*pool $i" /etc/ntp.conf; then
+
+						sed -i "s/^[[:blank:]#;]*pool $i.*/pool $i.$ntpd_mirror iburst/" /etc/ntp.conf
+
+					else
+
+						echo -e "pool $i.$ntpd_mirror iburst" >> /etc/ntp.conf
+
+					fi
+
+				done
+
+			#Uninstall ntp if not required
+			else
+
+				# - avoid dpsoftware uninstall if system first run is not completed
+				if (( $G_DIETPI_INSTALL_STAGE >= 0 )); then
+
+					/DietPi/dietpi/dietpi-software uninstall 170
+
+				else
+
+					G_AGP ntp
+
+				fi
+
+			fi
+
+			#Setup Drift mode, use SystemD
+			if (( $INPUT_MODE_VALUE == 4 )); then
+
+				# - Set NTPD mirror
+				cat << _EOF_ > /etc/systemd/timesyncd.conf
+[Time]
+Servers=0.$ntpd_mirror 1.$ntpd_mirror 2.$ntpd_mirror 3.$ntpd_mirror
+_EOF_
+
+				# - enable
+				systemctl daemon-reload
+				timedatectl set-ntp true
+
+			#Disable SystemD and allow "run_ntpd" script to take control
+			else
+
+				systemctl stop systemd-timesyncd
+				systemctl disable systemd-timesyncd
+
+			fi
+
+			# - Update DietPi.txt
+			sed -i "/CONFIG_NTP_MODE=/c\CONFIG_NTP_MODE=$INPUT_MODE_VALUE" /DietPi/dietpi.txt
+
+			# - Update now
+			/DietPi/dietpi/func/run_ntpd status
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# allo
+	#/////////////////////////////////////////////////////////////////////////////////////
+	Allo_Main(){
+
+		if [ -n "$INPUT_MODE_VALUE" ]; then
+
+			if [ "$INPUT_MODE_VALUE" = "eth_dhcp" ]; then
+
+				sed -i "/iface eth/c\iface eth0 inet dhcp" /etc/network/interfaces
+				sed -i "$(cat -n /etc/network/interfaces | grep 'dns-nameservers ' | sed -n 1p | awk '{print $1}')s/.*/#dns-nameservers 8.8.8.8/" /etc/network/interfaces
+
+			elif [ "$INPUT_MODE_VALUE" = "eth_static" ]; then
+
+				sed -i "/iface eth/c\iface eth0 inet static" /etc/network/interfaces
+				sed -i "$(cat -n /etc/network/interfaces | grep 'address ' | sed -n 1p | awk '{print $1}')s/.*/address $INPUT_ADDITIONAL_1/" /etc/network/interfaces
+				sed -i "$(cat -n /etc/network/interfaces | grep 'gateway ' | sed -n 1p | awk '{print $1}')s/.*/gateway $INPUT_ADDITIONAL_2/" /etc/network/interfaces
+				sed -i "$(cat -n /etc/network/interfaces | grep 'netmask ' | sed -n 1p | awk '{print $1}')s/.*/netmask $INPUT_ADDITIONAL_3/" /etc/network/interfaces
+				sed -i "$(cat -n /etc/network/interfaces | grep 'dns-nameservers ' | sed -n 1p | awk '{print $1}')s/.*/dns-nameservers $INPUT_ADDITIONAL_4/" /etc/network/interfaces
+
+			fi
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Users
+	#/////////////////////////////////////////////////////////////////////////////////////
+	Useradd_Main(){
+
+		if [ -n "$INPUT_MODE_VALUE" ]; then
+
+			# - Create $INPUT_MODE_VALUE
+
+			mkdir -p /home
+			useradd -m -s /bin/bash "$INPUT_MODE_VALUE"
+			chpasswd <<< "$INPUT_MODE_VALUE:$(cat /DietPi/dietpi.txt | grep -m1 '^AUTO_SETUP_GLOBAL_PASSWORD=' | sed 's/.*=//')"
+
+			#	Copy existing profile/bashrc
+			cp /root/.profile /home/$INPUT_MODE_VALUE/
+			cp /root/.bashrc /home/$INPUT_MODE_VALUE/
+
+			#	Sudo up dietpi login script
+			sed -i '/^\/DietPi\/dietpi\/login/c\sudo \/DietPi\/dietpi\/login' /home/$INPUT_MODE_VALUE/.bashrc
+
+			chown -R $INPUT_MODE_VALUE:$INPUT_MODE_VALUE /home/$INPUT_MODE_VALUE
+
+			#	Allow sudo without pw
+			if (( ! $(cat /etc/sudoers | grep -ci -m1 "^$INPUT_MODE_VALUE[[:space:]]") )); then
+
+				cat << _EOF_ >> /etc/sudoers
+$INPUT_MODE_VALUE ALL=NOPASSWD: ALL
+_EOF_
+
+			fi
+
+			#	Same groups as user pi
+			local group_array=()
+			group_array+=('input')
+			group_array+=('netdev')
+			group_array+=('spi')
+			group_array+=('i2c')
+			group_array+=('gpio')
+			group_array+=('tty')
+			group_array+=('users')
+			group_array+=('games')
+			group_array+=('plugdev')
+			group_array+=('video')
+			group_array+=('audio')
+			group_array+=('sudo')
+			group_array+=('cdrom')
+			group_array+=('dialout')
+			group_array+=('adm')
+
+			#	+ allow access to www-data
+			group_array+=('www-data')
+
+			for ((i=0; i<${#group_array[@]}; i++))
+			do
+
+				usermod -a -G ${group_array[$i]} $INPUT_MODE_VALUE
+
+			done
+
+			unset group_array
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	Userdel_Main(){
+
+		if [ -n "$INPUT_MODE_VALUE" ]; then
+
+			# - Delete $INPUT_MODE_VALUE
+			userdel -f $INPUT_MODE_VALUE
+			rm -R /home/$INPUT_MODE_VALUE
+
+			# - Remove from sudoers
+			sed -i "/^$INPUT_MODE_VALUE[[:space:]]/d" /etc/sudoers
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	Verify_DietPi_Txt(){
+
+		#Verify entries with git dietpi.txt
+		local gitbranch=$(grep -m1 '^DEV_GITBRANCH=' /DietPi/dietpi.txt | sed 's/.*=//')
+		if [ -z "$gitbranch" ]; then
+
+			gitbranch='master'
+
+		fi
+
+		INSTALL_URL="https://raw.githubusercontent.com/Fourdee/DietPi/$gitbranch/dietpi.txt"
+		G_CHECK_URL "$INSTALL_URL"
+		if (( $? == 0 )); then
+
+			G_DIETPI-NOTIFY 0 "Patching dietpi.txt"
+			wget "$INSTALL_URL" -O /tmp/dietpi.txt_patch
+
+			local entry=0
+			local value=0
+			while read line
+			do
+
+				entry=$(echo -e "$line" | grep "^[^#;/]" )
+
+				if [ -n "$entry" ]; then
+
+					value=$(echo -e "${entry##*=}") #*=X
+					entry=$(echo -e "${entry%%=*}") #X*
+
+					# - Patch new entry if required
+					if (( ! $(grep -ci -m1 "^$entry=" /DietPi/dietpi.txt) )); then
+
+						G_DIETPI-NOTIFY 2 "Updating dietpi.txt with new entry: $entry=$value"
+						cat << _EOF_ >> /DietPi/dietpi.txt
+$entry=$value
+_EOF_
+
+					else
+
+						G_DIETPI-NOTIFY 0 "Verified: $entry"
+
+					fi
+
+				fi
+
+			done < /tmp/dietpi.txt_patch
+			rm /tmp/dietpi.txt_patch
+
+			G_DIETPI-NOTIFY 0 "dietpi.txt verification completed"
+
+		else
+
+			G_DIETPI-NOTIFY 1 "Failed to verify dietpi.txt, $INSTALL_URL is offline and/or inaccessible"
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Main Loop
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#-----------------------------------------------------------------------------------
+	#info
+
+	G_DIETPI-NOTIFY 3 DietPi-Set_Software "$INPUT_MODE_NAME ($INPUT_MODE_VALUE)"
+
+	#-----------------------------------------------------------------------------------
+	if [ "$INPUT_MODE_NAME" = "apt-mirror" ]; then
+
+		AptMirror_Main
+
+	elif [ "$INPUT_MODE_NAME" = "useradd" ]; then
+
+		Useradd_Main
+
+	elif [ "$INPUT_MODE_NAME" = "userdel" ]; then
+
+		Userdel_Main
+
+	elif [ "$INPUT_MODE_NAME" = "ntpd-mirror" ]; then
+
+		NtpdMirror_Main
+
+	elif [ "$INPUT_MODE_NAME" = "ntpd-mode" ]; then
+
+		NtpdMode_Main
+
+	elif [ "$INPUT_MODE_NAME" = "allo" ]; then
+
+		Allo_Main
+
+	elif [ "$INPUT_MODE_NAME" = "verify_dietpi.txt" ]; then
+
+		Verify_DietPi_Txt
+
+	elif [ "$INPUT_MODE_NAME" = 'locale' ]; then
+
+		Locale_Main
+
+	else
+
+		Unknown_Input_Name
+
+	fi
+
+	#-----------------------------------------------------------------------------------
+	G_DIETPI-NOTIFY -1 $EXIT_CODE "$INPUT_MODE_NAME $INPUT_MODE_VALUE |"
+	#-----------------------------------------------------------------------------------
+	exit $EXIT_CODE
+	#-----------------------------------------------------------------------------------
+}

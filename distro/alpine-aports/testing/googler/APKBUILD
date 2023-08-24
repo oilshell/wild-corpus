@@ -1,0 +1,25 @@
+# Contributor: Ivan Tham <pickfire@riseup.net>
+# Maintainer: Ivan Tham <pickfire@riseup.net>
+pkgname=googler
+pkgver=3.3
+pkgrel=0
+pkgdesc="Google Search, Google Site Search, Google News from the terminal."
+url="https://github.com/jarun/googler"
+arch="noarch"
+license="GPL3"
+depends="python3"
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/jarun/${pkgname}/archive/v${pkgver}.tar.gz"
+builddir="$srcdir/"$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	make disable-self-upgrade
+}
+
+package() {
+	cd "$builddir"
+	make install DESTDIR="$pkgdir" PREFIX=/usr
+}
+
+sha512sums="3cf4a5584d542db0f7988b8a4f37836fe9bbf5183bec1d8eed62a68598c2d02c42f509b767518fbb75a13d14bd4e39b9ba11ebf385eb954dbadc5bfab5bab7af  googler-3.3.tar.gz"

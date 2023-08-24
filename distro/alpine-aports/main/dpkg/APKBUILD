@@ -1,0 +1,73 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=dpkg
+pkgver=1.18.24
+pkgrel=0
+pkgdesc="The Debian Package Manager"
+url="http://packages.debian.org/dpkg"
+arch="all"
+license="GPL"
+depends="xz"
+makedepends="bzip2-dev zlib-dev perl linux-headers"
+subpackages="$pkgname-doc $pkgname-dev"
+source="http://ftp.de.debian.org/debian/pool/main/d/$pkgname/${pkgname}_$pkgver.tar.xz
+	"
+
+builddir="$srcdir"/$pkgname-$pkgver
+prepare() {
+	cd "$builddir"
+	default_prepare || return 1
+
+	sed -i "s|<ncursesw/curses.h>|<curses.h>|g" dselect/dselect.h \
+		dselect/Makefile.in || return 1
+	sed -i "s|<ncursesw/term.h>|<term.h>|g" dselect/main.cc || return 1
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		--with-libz \
+		--with-libbz2 \
+		--disable-dselect \
+		--disable-start-stop-daemon \
+		--disable-nls \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+dev() {
+	default_dev
+	pkgdesc="Debian package development tools"
+	depends="perl"
+	mkdir -p "$subpkgdir"/usr/bin "$subpkgdir"/usr/share \
+		"$subpkgdir"/usr/lib/dpkg
+
+	mv "$pkgdir"/usr/bin/dpkg-architecture \
+		"$pkgdir"/usr/bin/dpkg-buildpackage \
+		"$pkgdir"/usr/bin/dpkg-checkbuilddeps \
+		"$pkgdir"/usr/bin/dpkg-distaddfile \
+		"$pkgdir"/usr/bin/dpkg-genchanges \
+		"$pkgdir"/usr/bin/dpkg-gencontrol \
+		"$pkgdir"/usr/bin/dpkg-gensymbols \
+		"$pkgdir"/usr/bin/dpkg-name \
+		"$pkgdir"/usr/bin/dpkg-scanpackages \
+		"$pkgdir"/usr/bin/dpkg-scansources \
+		"$pkgdir"/usr/bin/dpkg-shlibdeps \
+		"$pkgdir"/usr/bin/dpkg-source \
+		"$pkgdir"/usr/bin/dpkg-vendor \
+		"$subpkgdir"/usr/bin/ || return 1
+
+	mv "$pkgdir"/usr/share/perl* "$subpkgdir"/usr/share/
+}
+
+sha512sums="74df36a49a1b6b2243db14bd7ee0b69e50c2f0e79fc87e86e9b3cba2261fb717e421f7190a3ba54b4680a2f83855e5857dcb2625aa56847133258567392f1d42  dpkg_1.18.24.tar.xz"

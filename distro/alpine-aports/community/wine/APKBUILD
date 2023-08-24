@@ -1,0 +1,116 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=wine
+pkgver=2.0.2
+_pkgver=${pkgver/_/-}
+pkgrel=0
+pkgdesc="A compatibility layer for running Windows programs"
+url="http://www.winehq.com"
+arch="x86 x86_64"
+license="LGPL2+"
+subpackages="$pkgname-libs $pkgname-dev $pkgname-doc"
+depends_dev="$pkgname perl"
+makedepends="fontconfig-dev openldap-dev libxslt-dev libxxf86dga-dev
+	libxcursor-dev libxrandr-dev libxdamage-dev mesa-dev flex-dev bison
+	libpng-dev libjpeg-turbo-dev freetype-dev ncurses-dev libressl-dev
+	libxcomposite-dev libxrender-dev libxinerama-dev zlib-dev
+	cups-dev alsa-lib-dev lcms-dev libxml2-dev paxmark dbus-dev libxi-dev
+	gnutls-dev tiff-dev v4l-utils-dev udisks2-dev autoconf automake
+	"
+source="http://dl.winehq.org/$pkgname/source/${pkgver%.[1-9]}/$pkgname-$_pkgver.tar.xz
+	no-pie.patch
+	winhlp32-flex.patch
+	"
+builddir="$srcdir/$pkgname-$_pkgver"
+
+prepare() {
+	cd "$builddir"
+
+	default_prepare || return 1
+	aclocal && autoheader && autoreconf || return 1
+}
+
+build() {
+	cd "$builddir"
+
+	case "$CARCH" in
+		x86_64) _win64=--enable-win64;;
+	esac
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--libdir=/usr/lib \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--with-dbus \
+		--with-x \
+		$_win64 \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	local file
+	cd "$builddir"
+	make -j1 DESTDIR="$pkgdir" install || return 1
+
+	case "$CARCH" in
+		x86_64) _wine="wine64";;
+		*) _wine="wine";;
+	esac
+
+	paxmark -psmre "$pkgdir"/usr/bin/$_wine-preloader \
+		"$pkgdir"/usr/bin/$_wine
+
+	install -Dm755 tools/wineapploader \
+		"$pkgdir"/usr/bin/wineapploader || return 1
+
+	for file in msiexec notepad regedit regsvr32 wineboot \
+		winecfg wineconsole winefile winemine winepath
+	do
+		rm "$pkgdir"/usr/bin/$file || return 1
+		ln -sf /usr/bin/wineapploader "$pkgdir"/usr/bin/$file
+	done
+}
+
+dev() {
+	local file
+	default_dev || return 1
+
+	install -d "$subpkgdir"/usr/bin
+	for file in widl wmc wrc winebuild winedump function_grep.pl \
+		 winedbg winemaker winegcc winecpp wineg++
+	do
+		mv "$pkgdir"/usr/bin/$file "$subpkgdir"/usr/bin/
+	done
+
+	install -d "$subpkgdir"/usr/lib/wine
+	mv "$pkgdir"/usr/lib/wine/*.def "$subpkgdir"/usr/lib/wine/
+}
+
+doc() {
+	default_doc || return 1
+	rm -fr "$subpkgdir"/usr/share/man/*.UTF-8
+}
+
+libs() {
+	local file ext
+	default_libs || return 1
+
+	install -d "$subpkgdir"/usr/lib/wine/fakedlls
+	for ext in dll16 drv16 exe16 acm dll drv ds ocx sys tlb vxd; do
+		for file in $(find "$pkgdir/usr/lib/wine/fakedlls" -name "*.$ext"); do
+			mv "$pkgdir"/usr/lib/wine/fakedlls/${file##*/} \
+				"$subpkgdir"/usr/lib/wine/fakedlls/
+			mv "$pkgdir"/usr/lib/wine/${file##*/}.so \
+				"$subpkgdir"/usr/lib/wine/
+		done
+	done
+}
+
+sha512sums="3f37080a951819304cd3475f6012f1d6b5a94879b137cdf816cac4c8fde68ddc777905e92277ec5dce96437d8c32c43d55d3750b582781a9f9774b118f1a5b90  wine-2.0.2.tar.xz
+d853875f7d659617bdfba364704abd75b760d12977f1f13acc73acb3c8fefec0549677fb79a4f8955e073d64078b3071d63d97262522e22b7832a66d3d820a9c  no-pie.patch
+522a94a31fc459e80ea7dd05f7aee64f6ae666ec05236d06614acde118d5c60002e0f253ae75edb5f02164f22937ca89578504b690d1a5611bd60f703c8f0c00  winhlp32-flex.patch"

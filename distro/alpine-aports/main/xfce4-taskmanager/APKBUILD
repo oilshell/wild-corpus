@@ -1,0 +1,40 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=xfce4-taskmanager
+pkgver=1.2.0
+pkgrel=0
+pkgdesc="a simple taskmanager for the Xfce Desktop Environment"
+url="http://goodies.xfce.org/projects/applications/xfce4-taskmanager"
+arch="all"
+license="GPL2"
+depends=
+makedepends="libxfce4ui-dev libxmu-dev"
+subpackages="$pkgname-lang"
+source="http://archive.xfce.org/src/apps/${pkgname}/${pkgver%.*}/${pkgname}-${pkgver}.tar.bz2"
+
+_builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	cd "$_builddir"
+}
+
+build ()
+{
+	cd "$_builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--libexecdir=/usr/lib/xfce4 \
+		--localstatedir=/var \
+		--disable-static \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="45a496dc406eb825b9829a9cd0b76250566df0bf57dd39413112512209936b52cd3271fd1933dd972582178d897ef40ab8e106b2980db6963d29373940fdcc2d  xfce4-taskmanager-1.2.0.tar.bz2"

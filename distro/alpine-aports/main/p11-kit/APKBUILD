@@ -1,0 +1,54 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=p11-kit
+pkgver=0.23.2
+pkgrel=2
+pkgdesc="Library for loading and sharing PKCS#11 modules"
+url="http://p11-glue.freedesktop.org/"
+arch="all"
+license="BSD"
+depends=""
+depends_dev=""
+makedepends="libtasn1-dev libffi-dev"
+install=""
+subpackages="$pkgname-dev $pkgname-doc $pkgname-trust"
+source="http://p11-glue.freedesktop.org/releases/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--sysconfdir=/etc \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--with-trust-paths=/etc/ssl/certs/ca-certificates.crt
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+trust() {
+	pkgdesc="System trust module from $pkgname"
+	mkdir -p "$subpkgdir"/usr/share/p11-kit/modules \
+		"$subpkgdir"/usr/lib/p11-kit \
+		"$subpkgdir"/usr/lib/pkcs11
+
+	mv "$pkgdir"/usr/lib/p11-kit/trust-extract-compat \
+		"$subpkgdir"/usr/lib/p11-kit/
+	mv "$pkgdir"/usr/share/p11-kit/modules/p11-kit-trust.module \
+		"$subpkgdir"/usr/share/p11-kit/modules/
+	mv "$pkgdir"/usr/lib/pkcs11/p11-kit-trust.so \
+		"$subpkgdir"/usr/lib/pkcs11/
+}
+
+sha512sums="b665d89f0d752a41b01ec53e29c801c4fdcaf3f21fce524984b10acef0477ad5dbac085edd35ffb747423d0e1e09660b8d29501c979cf54937d3b9d2561cf18f  p11-kit-0.23.2.tar.gz"

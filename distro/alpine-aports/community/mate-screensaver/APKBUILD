@@ -1,0 +1,36 @@
+# Contributor: Alan Lacerda <alacerda@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=mate-screensaver
+pkgver=1.19.0
+pkgrel=0
+pkgdesc="A screen saver and locker for MATE"
+url="https://github.com/mate-desktop/mate-screensaver"
+arch="all"
+license="GPLv2"
+makedepends="intltool glib-dev libxscrnsaver-dev gtk+3.0-dev
+	mate-desktop-dev dbus-glib-dev mate-menus-dev dconf-dev"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+source="http://pub.mate-desktop.org/releases/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver/"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--sysconfdir=/etc \
+		--prefix=/usr
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="57ebf73eb86366ba4c3f712bbac174c43f6b697ec9a10c98dc196bcb5cdc47184299663d909e73b4f38ccba27caa03bf419b86c370525c81b9b3120921490108  mate-screensaver-1.19.0.tar.xz"

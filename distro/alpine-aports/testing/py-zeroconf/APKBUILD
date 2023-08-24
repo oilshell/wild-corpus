@@ -1,0 +1,48 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-zeroconf
+_pkgname=zeroconf
+pkgver=0.19.1
+pkgrel=0
+pkgdesc="A Python implementation of multicast DNS service discovery"
+url="https://github.com/jstasiak/python-zeroconf"
+arch="noarch"
+license="LGPL2+"
+depends="py-six py-netifaces"
+makedepends="python2-dev py-setuptools python3-dev"
+subpackages="py3-$_pkgname:_py3 py2-$_pkgname:_py2"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$_pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	depends="${depends//py-/py2-} py2-enum34"
+	_py python2
+}
+
+_py3() {
+	depends="${depends//py-/py3-}"
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+sha512sums="1a7ac803caca1b230eba6c4bcfb714613f218850d9373ea0de609a3c9a509d13acfd14d64f9efbab78637b74aebdf385cf2deded1ff871fc6f3aea4477a07730  zeroconf-0.19.1.tar.gz"

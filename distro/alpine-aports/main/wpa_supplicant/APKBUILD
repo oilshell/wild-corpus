@@ -1,0 +1,72 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=wpa_supplicant
+pkgver=2.6
+pkgrel=6
+pkgdesc="A utility providing key negotiation for WPA wireless networks"
+url="https://w1.fi/wpa_supplicant/"
+arch="all"
+license="BSD"
+subpackages="$pkgname-doc"
+makedepends="linux-headers libressl-dev dbus-dev libnl3-dev pcsc-lite-dev"
+source="http://w1.fi/releases/$pkgname-$pkgver.tar.gz
+	wpa_supplicant.initd
+	wpa_supplicant.confd
+	libressl.patch
+	eloop.patch
+
+	config
+	wpa_cli.sh"
+
+builddir="$srcdir"/$pkgname-$pkgver
+prepare() {
+	cd "$builddir"
+	default_prepare
+
+	# Copy our configuration file to the build directory
+	cp "$srcdir"/config "$builddir"/wpa_supplicant/.config
+}
+
+build() {
+	cd "$builddir"/wpa_supplicant
+	make LIBDIR=/lib BINDIR=/sbin
+	make eapol_test
+}
+
+package() {
+	cd "$builddir"/wpa_supplicant
+	make DESTDIR="$pkgdir" LIBDIR=/lib BINDIR=/sbin install
+	install -Dm644 wpa_supplicant.conf \
+		"$pkgdir"/usr/share/doc/wpa_supplicant/examples/wpa_supplicant.conf
+	install -Dm755 "$srcdir"/wpa_cli.sh \
+		"$pkgdir"/etc/wpa_supplicant/wpa_cli.sh
+
+	local man=
+	for man in doc/docbook/*.?; do
+		install -Dm644 "$man" \
+			"$pkgdir"/usr/share/man/man${man##*.}/${man##*/}
+	done
+	install -Dm755 eapol_test "$pkgdir"/sbin/eapol_test
+
+	# dbus
+	cd dbus
+	install -d "$pkgdir"/etc/dbus-1/system.d
+	install -m644 dbus-wpa_supplicant.conf \
+		"$pkgdir"/etc/dbus-1/system.d/wpa_supplicant.conf
+	install -d "$pkgdir"/usr/share/dbus-1/system-services
+	install fi.epitest.hostap.WPASupplicant.service \
+		"$pkgdir"/usr/share/dbus-1/system-services
+	install -d "$pkgdir"/var/run/wpa_supplicant
+	install -Dm755 "$srcdir"/wpa_supplicant.initd \
+		"$pkgdir"/etc/init.d/wpa_supplicant
+	install -Dm644 "$srcdir"/wpa_supplicant.confd \
+		"$pkgdir"/etc/conf.d/wpa_supplicant
+}
+
+sha512sums="46442cddb6ca043b8b08d143908f149954c238e0f3a57a0df73ca4fab9c1acd91b078f3f26375a1d99cd1d65625986328018c735d8705882c8f91e389cad28a6  wpa_supplicant-2.6.tar.gz
+11eed22f6e793f40c788d586c715deecae03c421d11761b7b4a376660bce812c54cc6f353c7d4d5da9c455aeffd778baefb9e76d380027a729574a756e54ddcc  wpa_supplicant.initd
+29103161ec2b9631fca9e8d9a97fafd60ffac3fe78cf613b834395ddcaf8be1e253c22e060d7d9f9b974b2d7ce794caa932a2125e29f6494b75bce475f7b30e1  wpa_supplicant.confd
+e98edc1ecec91335d515c50cac8816e3f6eef139aba574bcf0c6c20c131ef0de40aa657a33d07af09ab28245471a09cb6b3e29b306e48f46d335a0c47a0a56c4  libressl.patch
+2be055dd1f7da5a3d8e79c2f2c0220ddd31df309452da18f290144d2112d6dbde0fc633bb2ad02c386a39d7785323acaf5f70e5969995a1e8303a094eb5fe232  eloop.patch
+6707991f9a071f2fcb09d164d31d12b1f52b91fbb5574b70b8d6f9727f72bbe42b03dd66d10fcc2126f5b7e49ac785657dec90e88b4bf54a9aa5638582f6e505  config
+44d33cfe419cdb65cc14f2ac05aa9f8a1b9f2f432181e498071e41ef835662db1e4c5142adf4cfab2475e7b606696169936bd159d1d711f803322db93f242361  wpa_cli.sh"

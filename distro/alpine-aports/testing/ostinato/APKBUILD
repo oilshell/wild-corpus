@@ -1,0 +1,45 @@
+# Maintainer: Corentin Henry <corentinhenry@gmail.com>
+# Contributor: Corentin Henry <corentinhenry@gmail.com>
+pkgname=ostinato
+pkgver=0.8
+pkgrel=0
+pkgdesc="Packet/Traffic Generator and Analyzer"
+url="http://www.ostinato.org/"
+arch="all"
+license="GPLv3"
+depends=""
+makedepends="qt-dev protobuf-dev libpcap-dev paxmark"
+subpackages="$pkgname-drone $pkgname-gui"
+source="$pkgname-$pkgver.tar.gz::https://github.com/pstavirs/$pkgname/archive/v$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	qmake PREFIX=/usr
+	make
+}
+
+package() {
+	cd "$builddir"
+
+	make INSTALL_ROOT="$pkgdir" install
+	paxmark -m "$pkgdir"/usr/bin/drone
+	paxmark -m "$pkgdir"/usr/bin/ostinato
+}
+
+drone() {
+	pkgdesc="ostinato controller"
+
+	install -d "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/bin/drone "$subpkgdir"/usr/bin/drone
+}
+
+gui() {
+	pkgdesc="graphical controller for ostinato"
+
+	install -d "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/bin/ostinato "$subpkgdir"/usr/bin/ostinato
+}
+
+sha512sums="0f2430e1df7a8e36e6d4db3dffbf575203e3127f2fd4e035e17752a140c263b9b97611d6028d80c9238c788fb5f0b303e5511fe250fffcf8762d4e52c0ade61d  ostinato-0.8.tar.gz"

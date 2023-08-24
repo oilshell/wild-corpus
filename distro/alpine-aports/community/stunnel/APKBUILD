@@ -1,0 +1,55 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Dean Takemori <deant@hawaii.rr.com>
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+pkgname=stunnel
+pkgver=5.42
+pkgrel=0
+pkgdesc="SSL encryption wrapper between network client and server."
+url="http://www.stunnel.org/"
+arch="all"
+license="GPL2+ with OpenSSL exception"
+makedepends="libressl-dev"
+subpackages="$pkgname-doc"
+install="$pkgname.pre-install"
+source="http://www.stunnel.org/downloads/archive/${pkgver%.*}.x/stunnel-$pkgver.tar.gz
+	stunnel-libressl.patch
+	stunnel.initd
+	stunnel.conf"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		--disable-fips
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	install -Dm755 "$srcdir"/stunnel.initd \
+		"$pkgdir"/etc/init.d/stunnel
+	install -m644 "$srcdir"/stunnel.conf \
+		"$pkgdir"/etc/stunnel/stunnel.conf
+
+	mkdir -p "$pkgdir"/usr/share/doc/$pkgname/examples/
+	mv "$pkgdir"/etc/stunnel/stunnel.conf-sample \
+		"$pkgdir"/usr/share/doc/$pkgname/examples/
+}
+
+sha512sums="875af19e8a4fa8e983e98d3e6bea198b789bea9b18933ed74aa1f9ce6922e4c4dd3a4ccae3b74c12de30c39b68c3210c9adb7cd228c7fefc28dff258dcdb4968  stunnel-5.42.tar.gz
+43bb220856b6f1ce04a5f30f7482c135043310962867ac4b7e5505f2347dd3c205738ea3a72a48dfa71f040060c3c1080ef06dd15053122ba720053bb49cdd6c  stunnel-libressl.patch
+33e215413e08fdd5783cc76e6ba6a2342fb6d0573f801815c4d3022625e71be6c9739d47a7a61bf7c803f27911b9c92cf6ae3e522add040f83802e1aaeaee000  stunnel.initd
+a72bfddeb74787d58c9fd24782d86c0498ce3530a43fbdd4ec4c4b57baa6257b6ef21005aca274b22c4a22cdbbbcee63dd3d841f458af248db9c69e8d59fa56f  stunnel.conf"

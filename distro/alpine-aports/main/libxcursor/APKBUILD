@@ -1,0 +1,33 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libxcursor
+pkgver=1.1.14
+pkgrel=2
+pkgdesc="X cursor management library"
+url="http://xorg.freedesktop.org/"
+arch="all"
+license="custom"
+options="!check"  # No test suite.
+subpackages="$pkgname-dev $pkgname-doc"
+depends=
+makedepends="util-macros xproto libx11-dev libxrender-dev libxfixes-dev"
+source="http://www.x.org/releases/individual/lib/libXcursor-$pkgver.tar.bz2"
+
+builddir="$srcdir"/libXcursor-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+md5sums="1e7c17afbbce83e2215917047c57d1b3  libXcursor-1.1.14.tar.bz2"
+sha256sums="9bc6acb21ca14da51bda5bc912c8955bc6e5e433f0ab00c5e8bef842596c33df  libXcursor-1.1.14.tar.bz2"
+sha512sums="687963b54da66be25371f64a88f91812b38de4ffc3b806070f3aeb1da379df16ede819201a352b3fb66efc6b40a36a22770add3ae464f2008aff3e23cb60a8e6  libXcursor-1.1.14.tar.bz2"

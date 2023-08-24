@@ -1,0 +1,144 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=rrdtool
+pkgver=1.5.6
+pkgrel=2
+pkgdesc="Data logging and graphing application"
+url="http://www.rrdtool.org"
+arch="all"
+license="GPL"
+depends="font-sony-misc"
+makedepends="libart-lgpl-dev libpng-dev freetype-dev perl-dev cairo-dev libxml2-dev
+	pango-dev lua lua-dev python2-dev groff
+	autoconf automake libtool"
+subpackages="$pkgname-dev $pkgname-doc perl-rrd:perl_rrd lua-rrd:lua_rrd py-rrd:py_rrd
+	$pkgname-cached $pkgname-cgi $pkgname-utils librrd-th:libth librrd:libs"
+source="http://oss.oetiker.ch/$pkgname/pub/$pkgname-$pkgver.tar.gz
+	lua-install-cmod.patch
+	libm-underlinking.patch
+	no-posix-fallocate.patch
+	dont-install-in-usr-local.patch
+	rrdcached.initd
+	"
+options="!check"
+builddir="$srcdir"/$pkgname-$pkgver
+
+prepare() {
+	cd "$builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+	libtoolize --force && aclocal && autoconf --force && automake --add-missing
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--disable-nls \
+		--disable-tcl \
+		--disable-ruby \
+		--enable-rrdcgi \
+		--enable-perl-site-install \
+		--enable-lua-site-install \
+		--with-perl-options="INSTALLDIRS=vendor" \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	export INSTALLDIRS=vendor
+	make DESTDIR="$pkgdir" install || return 1
+	find "$pkgdir" -name '.packlist' -delete
+	find "$pkgdir" -name 'perllocal.pod' -delete
+}
+
+dev() {
+	default_dev
+	mkdir -p "$subpkgdir"/usr/share/$pkgname
+	mv "$pkgdir"/usr/share/$pkgname/examples "$subpkgdir"/usr/share/$pkgname/
+}
+
+perl_rrd() {
+	depends=
+	pkgdesc="Perl interface for rrdtool"
+	mkdir -p "$subpkgdir"/usr/lib \
+		"$pkgdir"/usr/share
+	mv "$pkgdir"/usr/lib/perl* "$subpkgdir"/usr/lib/
+	mv "$pkgdir"/usr/share/perl* "$subpkgdir"/usr/share/
+}
+
+lua_rrd() {
+	depends=
+	pkgdesc="Lua interface for rrdtool"
+	mkdir -p "$subpkgdir"/usr/lib/
+	mv "$pkgdir"/usr/lib/lua "$subpkgdir"/usr/lib/
+}
+
+py_rrd() {
+	depends=
+	pkgdesc="Python interface for rrdtool"
+	mkdir -p "$subpkgdir"/usr/lib/
+	mv "$pkgdir"/usr/lib/python* "$subpkgdir"/usr/lib/
+}
+
+cached() {
+	depends=
+	pkgdesc="RRDtool data caching daemon"
+	mkdir -p "$subpkgdir"/usr/sbin \
+		"$subpkgdir"/var/lib/rrdcached/db \
+		"$subpkgdir"/var/lib/rrdcached/journal
+	mv "$pkgdir"/usr/bin/rrdcached "$subpkgdir"/usr/sbin
+	install -Dm755 "$srcdir"/rrdcached.initd "$subpkgdir"/etc/init.d/rrdcached
+}
+
+cgi() {
+	depends=
+	pkgdesc="create web pages containing RRD graphs based on templates"
+	mkdir -p "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/bin/rrdcgi "$subpkgdir"/usr/bin
+}
+
+utils() {
+	depends=
+	pkgdesc="RRDtool standalone create,update,info utilities"
+	mkdir -p "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/bin/rrdinfo \
+		"$pkgdir"/usr/bin/rrdcreate \
+		"$pkgdir"/usr/bin/rrdupdate \
+		"$subpkgdir"/usr/bin
+}
+
+libth() {
+	depends=
+	pkgdesc="$pkgdesc (multi-threaded libraries)"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/librrd_th.so* "$subpkgdir"/usr/lib
+}
+
+libs() {
+	depends=
+	default_libs
+}
+
+md5sums="c3703bca0472e43930e3ddaa848446fc  rrdtool-1.5.6.tar.gz
+f94e916381af48dcf5687aa046b35aac  lua-install-cmod.patch
+ab92a2b87f71d59e3830dac3b227c357  libm-underlinking.patch
+e14d13f10fa575733e791bcb8b0711fe  no-posix-fallocate.patch
+d1a4b08c484b9dfd120c9691f8204919  rrdcached.initd"
+sha256sums="9832775479684b8f94767201ee0440a1cacdbbbb7dd6736eb96b9a0750644ce8  rrdtool-1.5.6.tar.gz
+1e49eeca4561d29da3975f84e06b27f0f305e566bb26922397d938eede678b71  lua-install-cmod.patch
+0495bd122941bcd635ca2a2b7c3f01a6eb3ca3e00b7e40c257862b7071b7738a  libm-underlinking.patch
+8b32dcf1b8c7f9967934e25ab05ef6a9384cb6096d32dd5d63046bafd7cac1ad  no-posix-fallocate.patch
+b05b61a7d2ef4db480b276c1351b50eea5d73c9d0c0223d32ab548d6476926f7  rrdcached.initd"
+sha512sums="b980e36932683dbe2c2793c291c34e1c3a7fba208bda35b4b2d4fc994a9539c3c19f568e184d4fc13f9647b2715151147deeaf975d978f820e449129f3cfb7fd  rrdtool-1.5.6.tar.gz
+0be4ebb864233cf32fa70c872f5421b2da50ad39d6a265c2f5869337b40647c0b88011ccf41fe17a8d35de915ca1c38d04d67696118e1e32ff774221b1816ab6  lua-install-cmod.patch
+94449972ccc7d1a057c2b827c041a16de1667c280a47ef30c1323ec9168812a96374704cc42dd832a30b8cc08d7fad94da44ff3695c66f3a0d324a87158fc23c  libm-underlinking.patch
+00d079161551a75f8d4fe5085741d45d9c6b06be0a5163090143c6ab47710e29633414bee4dd68bbf950bf0ba1796bf4623b4f307477265a48f49514c8b790ab  no-posix-fallocate.patch
+839d9a2fbb74332cc9d0de18828f1496103b0cca6f05b3f88437dff6289954952f51350dcf01543d234ded19798115d400d9d61722e7193cd7f2bce47c14f6be  dont-install-in-usr-local.patch
+c0c27b2c2dfa8e7ec1cb1160d2bda8d7996bbea67f4ce7779da029f583c35e5e415cf46e2a1e5cb8ed2e63d2c58a68fd7471ee6bd820db4c0f4eeeb5c252f8a3  rrdcached.initd"

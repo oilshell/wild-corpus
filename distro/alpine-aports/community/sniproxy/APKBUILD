@@ -1,0 +1,60 @@
+# Maintainer: Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=sniproxy
+pkgver=0.5.0
+pkgrel=0
+pkgdesc="Proxies incoming HTTP and TLS connections based on the hostname
+	contained in the initial request of the TCP session."
+url="https://github.com/dlundquist/sniproxy"
+arch="all"
+license="GPL"
+depends=
+depends_dev=
+makedepends="$depends_dev autoconf automake bsd-compat-headers gettext-dev
+	libev-dev libtool pcre-dev udns-dev
+	"
+install="${pkgname}.pre-install"
+subpackages="$pkgname-doc"
+pkgusers="sniproxy"
+pkggroups="sniproxy"
+source="sniproxy-$pkgver.tar.gz::https://github.com/dlundquist/$pkgname/archive/$pkgver.tar.gz
+	$pkgname.initd
+	$pkgname.conf
+	$pkgname.logrotate
+	"
+
+_builddir="$srcdir"/$pkgname-$pkgver
+
+prepare() {
+	cd "$_builddir"
+	# apply patches here
+}
+
+build() {
+	cd "$_builddir"
+	./autogen.sh && ./configure \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	install -Dm755 "$srcdir"/$pkgname.initd \
+			"$pkgdir"/etc/init.d/$pkgname || return 1
+	install -Dm644 "$srcdir"/$pkgname.conf \
+			"$pkgdir"/etc/$pkgname/$pkgname.conf || return 1
+	install -Dm644 "$srcdir"/$pkgname.logrotate \
+			"$pkgdir"/etc/logrotate.d/$pkgname || return 1
+	for dir in /var/log /etc /var/run; do
+		mkdir -p "$pkgdir"/$dir/$pkgname
+		chown $pkgusers:$pkggroups "$pkgdir"/$dir/$pkgname
+	done
+}
+
+sha512sums="52dbb217193d2b7bf9dea37b13fde395b5c56d0a6627508a245f2807920deb282aae3c1ae7e6b5fa68432990e48998989fd28027b65cb7310f214b29f98e5e5d  sniproxy-0.5.0.tar.gz
+57f4997f8a96516b4622105c024708bf39002a83d7f3eb76dd857ee0202598309b51d585f6b25b5e72e9710b79c36a3e4f21bc2effcead16dd2c032137c704f3  sniproxy.initd
+f7423cfd48e9333d5db857b4eb61b747664221607e2d47a55167493159b7b838580f101427e98252468c0be9c42693f7f0689ac8bd1acdcd1dfb75638a8f49fb  sniproxy.conf
+8c026af5ed23620776ef5a9a08f09236d30fc5152c9f95de2b95eb7ac48ad001c21010922d74dc7c78071f9e6ef8f794c2a59c11677d8e12be8d57e94bac2b5e  sniproxy.logrotate"

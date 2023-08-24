@@ -1,0 +1,24 @@
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+pkgname=nimble
+pkgver=0.8.8
+pkgrel=0
+pkgdesc="Package manager for the Nim programming language"
+url="https://github.com/nim-lang/nimble"
+arch="all"
+license="BSD3"
+depends="nim"
+source="$pkgname-$pkgver.tar.gz::https://github.com/nim-lang/$pkgname/archive/v$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	nim compile -d:release src/nimble
+}
+
+package() {
+	cd "$builddir"
+	install -D -m 755 src/nimble "$pkgdir"/usr/bin/nimble
+}
+
+sha512sums="4201ed0856b26505e83aa885624065a0200dead9cbc0d5bc0ba750da597b9c37708c1783f7fe518d2bdff954b53ccbc9f92d723f2ce41f4799c8fb9d895c1c6e  nimble-0.8.8.tar.gz"

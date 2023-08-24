@@ -1,0 +1,44 @@
+# Contributor: William Pitcock <nenolod@dereferenced.org>
+# Maintainer: William Pitcock <nenolod@dereferenced.org>
+pkgname=libedit
+pkgver=20170329.3.1
+_ver=${pkgver/./-}
+pkgrel=3
+pkgdesc="BSD line editing library"
+url="http://www.thrysoee.dk/editline/"
+arch="all"
+license="BSD"
+depends=""
+depends_dev="ncurses-dev"
+makedepends="$depends_dev"
+install=""
+subpackages="$pkgname-dev $pkgname-doc"
+source="http://www.thrysoee.dk/editline/libedit-$_ver.tar.gz"
+
+builddir="$srcdir"/libedit-$_ver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	rm "$pkgdir"/usr/share/man/man3/history.3*
+}
+
+sha512sums="597ed2282240be6dc3c4a7bb8b4ade31fe16ebfeb2229e3aec58643a65882653cc91deb300343d1b1cc588959dbf95698122c4005e47dfb947efa3e6b134bb82  libedit-20170329-3.1.tar.gz"

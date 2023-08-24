@@ -1,0 +1,33 @@
+# Contributor: Francesco Colista <fcolista@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=py3-multidict
+_pkgname=multidict
+pkgver=3.2.0
+pkgrel=0
+pkgdesc="A multidict implementation"
+url="https://github.com/aio-libs/multidict/"
+arch="all"
+license="ASL 2.0"
+depends="python3"
+makedepends="python3-dev py-setuptools"
+subpackages="$pkgname-dev"
+source="$_pkgname-$pkgver.tar.gz::https://github.com/aio-libs/multidict/archive/v$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+options="!strip"
+
+check() {
+	cd "$builddir"
+	python3 setup.py check
+}
+
+build() {
+	cd "$builddir"
+	python3 setup.py build
+}
+
+package() {
+	cd "$builddir"
+	python3 setup.py install --prefix=/usr --root="$pkgdir"
+}
+
+sha512sums="20a127706eaecbaafd19953625aef9dbee4dfddca3a74f5972d6ff0fb3e1a3c0e336a5b305b4b4dd1cf0c447835f362e363445d51c5b311c5db6035a232fad70  multidict-3.2.0.tar.gz"

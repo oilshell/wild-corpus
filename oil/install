@@ -1,0 +1,44 @@
+#!/bin/sh 
+#
+# POSIX shell script to install a build oil into the proper directory.
+# Distributed with the source tarball.
+
+# TODO:
+# - copy bin/oil with the right permissions.
+# - make dummy man page that points to HTML docs?
+#   - or just a cheat sheet for flags, usage, etc.
+
+# NOTE: install is part of coreutils and busybox.
+
+die() {
+  echo "FATAL install error: $@" 1>&2
+  exit 1
+}
+
+# NOTE: The configure step
+main() {
+  if ! . _build/detected-config.sh; then
+    die "Can't find _build/detected-config.h.  Run './configure'"
+  fi
+
+  # Now $PREFIX should be defined
+
+  #local exec_filename=oil.ovm-dbg  # Should this go in configure output?
+  local exec_filename=oil.ovm  # Should this go in configure output?
+
+  local dest=$PREFIX/bin/$exec_filename
+
+  echo "Installing to $dest"
+  if ! install _bin/$exec_filename $dest; then
+    die "Couldn't install oil binary"
+  fi
+
+  cd $PREFIX/bin
+  for link in osh oshc; do
+    if ! ln -s -f $exec_filename $link; then  # -f to overwrite
+      die "Couldn't create $link symlink"
+    fi
+  done
+}
+
+main "$@"

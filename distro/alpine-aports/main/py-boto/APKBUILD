@@ -1,0 +1,45 @@
+# Contributor: Matt Smith <mcs@darkregion.net>
+# Maintainer: Matt Smith <mcs@darkregion.net>
+pkgname=py-boto
+_pkgname=boto
+pkgver=2.47.0
+pkgrel=0
+pkgdesc="An interface to infrastructural services offered by Amazon Web Services"
+url="http://docs.pythonboto.org/en/latest/index.html"
+arch="noarch"
+license="MIT"
+depends="python2"
+makedepends="python2-dev py-setuptools"
+install=""
+subpackages="$pkgname-doc"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$_pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+}
+
+package() {
+	cd "$builddir"
+	python2 setup.py install --root "$pkgdir" || return 1
+}
+
+doc() {
+	cd "$builddir"
+
+	mkdir -p "$subpkgdir"/usr/share/doc/$pkgname
+	install -Dm644 README.rst "$subpkgdir"/usr/share/doc/$pkgname/README
+
+	# Note: The documentation in the 'docs' directory can only be generated
+	# (via sphinx-build from the py-sphinx package) once this package has
+	# been installed.  Copying it off for the user.
+	mkdir -p "$subpkgdir"/usr/share/doc/$pkgname/docs
+	cp -R ./docs/* "$subpkgdir"/usr/share/doc/$pkgname/docs/
+	chmod -R 644 "$subpkgdir"/usr/share/doc/$pkgname/docs/
+
+	# Fix subdir perms
+	find "$subpkgdir"/usr/share/doc/$pkgname/ -type d -exec chmod 755 '{}' \;
+}
+
+sha512sums="66d3e8ca89ccba69105bee7072f7b6e21728a834c468989f1806235f84aa9484dd8d3a311754b3132cdafa0fc9291c12d0d3fdea72e3d31bd62a01109d43ec40  boto-2.47.0.tar.gz"

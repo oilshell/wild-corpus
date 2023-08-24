@@ -1,0 +1,29 @@
+# Contributor: Francesco Colista <fcolista@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=libre2
+_pkgname=re2
+pkgver=2017.08.01
+_pkgver=${pkgver//./-}
+pkgrel=0
+pkgdesc="an efficient, principled regular expression library"
+url="https://github.com/google/re2"
+arch="all"
+license="custom"
+options="!check"
+subpackages="$pkgname-dev $pkgname-doc"
+source="https://github.com/google/$_pkgname/archive/$_pkgver.tar.gz"
+builddir="$srcdir"/$_pkgname-$_pkgver
+
+build() {
+	cd "$builddir"
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" prefix=/usr install
+	install -Dm644 LICENSE \
+		"$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="a7b37ab1873c640e5c00cfede61c6dcc68f7efb9801524fa7d2db492c9e03eb892906b852c40c8fe370c6664e85a89cfe0a2f97ab95ed88a9d4a2aa197e1f883  2017-08-01.tar.gz"

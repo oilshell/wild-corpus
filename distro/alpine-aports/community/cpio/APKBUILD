@@ -1,0 +1,39 @@
+# Contributor: Stuart Cardall <developer@it-offshore.co.uk>
+# Maintainer: Stuart Cardall <developer@it-offshore.co.uk>
+pkgname=cpio
+pkgver=2.12
+pkgrel=2
+pkgdesc="A tool to copy files into or out of a cpio or tar archive"
+url="http://www.gnu.org/software/cpio"
+arch="all"
+license="GPL"
+depends=""
+checkdepends="bash"
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.bz2::http://ftp.snt.utwente.nl/pub/software/gnu/cpio/$pkgname-$pkgver.tar.bz2"
+
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	rm -f "$pkgdir"/usr/lib/charset.alias
+	rm -f "$pkgdir"/usr/libexec/rmt # part of the tar pkg
+	rm "$pkgdir"/usr/share/man/*/rmt.*
+}
+
+sha512sums="0cd4da5f2fbca179ab4e666a5f878414c086a5f98bce4c76273f21d9b2a6fe422d901b5d453826c5f81bbe363aa015047a1e99779ad1a451c8feca6205c63120  cpio-2.12.tar.bz2"

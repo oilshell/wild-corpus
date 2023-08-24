@@ -1,0 +1,56 @@
+# Contributor: Michael Mason <ms13sp@gmail.com>
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=dhcpcd
+pkgver=6.11.5
+pkgrel=1
+pkgdesc="RFC2131 compliant DHCP client"
+url="http://roy.marples.name/projects/dhcpcd/"
+arch="all"
+license="BSD-2"
+depends=""
+depends_dev=""
+makedepends="$depends_dev linux-headers bsd-compat-headers dbus-dev"
+install=""
+subpackages="$pkgname-doc"
+source="http://roy.marples.name/downloads/dhcpcd/$pkgname-$pkgver.tar.xz
+	busybox-logger.patch
+	fix-chrony-conf-location.patch
+	dhcpcd.initd
+	"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	cd "$builddir"
+	CFLAGS="$CFLAGS -D_GNU_SOURCE -DHAVE_PRINTF_M"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		--libexecdir=/usr/lib/$pkgname \
+		--dbdir=/var/lib/$pkgname \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	install -Dm755 "$srcdir"/dhcpcd.initd \
+		"$pkgdir"/etc/init.d/dhcpcd || return 1
+}
+
+md5sums="2465624b62c1154f0e89dc69c42c849b  dhcpcd-6.11.5.tar.xz
+231d2b03e7e93fa6cc7406889e9945e3  busybox-logger.patch
+3445d2e63c1401a705b34f6142fbe71e  fix-chrony-conf-location.patch
+5cd5809d11b77b30f21df8418729d70b  dhcpcd.initd"
+sha256sums="6f9674dc7e27e936cc787175404a6171618675ecfb6903ab9887b1b66a87d69e  dhcpcd-6.11.5.tar.xz
+aec6c5d7a41551ca7cd3849a53621692ee0a1a6d259892beaf448eb1f2d4af01  busybox-logger.patch
+08dd172591ec4698f28059e4c692c3ca2fe9ed4d13244be05860813b8ba5c6af  fix-chrony-conf-location.patch
+6bb9b8b0075e45e63e898ed043f3c5951dc3e95c1fa62d22cc6e0616c792ecd1  dhcpcd.initd"
+sha512sums="a23d5dde66567c4addbc86c8b3fbf2c5d4dba3b463659729778a310306ab0e949be8998154ef15401ac2d289bde2f090d44492bba6a1becd2f01890d4efe7051  dhcpcd-6.11.5.tar.xz
+83dc7bfd36b6b416c931775bb35a0d2951ed04c421195c45bfed80a11a7adbed7c80ade1c1246847c2fb1bf15a7b6e83100f16605ee84f750440d7bc9f7f5ef3  busybox-logger.patch
+4e07c886d89aa4962e683383098d343030a24838e3c3d86ac79c00aad87dcaf41352ac04556a2bf0e00c1b9bad370351e254e83fa76f6e299102fd292b5f6a70  fix-chrony-conf-location.patch
+6d3220155f2d9ed3e3a00afd378eeb70d435e19804201f8bb35498f1f7f3dfdaeaa2f4a01a18f5e96b457d9c173bc6a206b3e67ebf6d95da7e7b350dcd153fde  dhcpcd.initd"

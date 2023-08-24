@@ -1,0 +1,502 @@
+#!/bin/bash
+Setup.require Config
+Setup.provide Haskell 1.0
+
+Config.param /haskell/packages : a list of packages to install from Hackage
+Config.param /haskell/base-packages : a list of already-installed packages
+Config.param /haskell/local-packages : a list of package source directories
+
+: ${HS_PREFIX=/${SETUP_PREFIX}}
+
+: ${HS_BUILD=${HS_PREFIX}.build/haskell}
+: ${HS_ETC=${HS_PREFIX}etc}
+: ${HS_BIN=${HS_PREFIX}.dist/bin}
+: ${HS_SRC=${HS_PREFIX}src}
+: ${HS_PKG=$HS_BUILD/package}
+: ${HS_DEP=$HS_BUILD/deps}
+: ${HS_CONF=$HS_BUILD/conf}
+: ${HS_POOL=$HS_BUILD/pool}
+: ${HS_OBJ=$HS_BUILD/obj}
+: ${HS_LOG=$HS_BUILD/log}
+
+GHC_VERSION="$(ghc --version)"
+GHC_VERSION="${GHC_VERSION#* version }"
+GHC_VNUM="$(IFS=. ver=( $GHC_VERSION ); printf "%d%02d" ${ver[0]} ${ver[1]})"
+
+function Hackage.get() {
+    local pkg="${2#-}"
+    mkpdir "$1"
+    curl -Ls http://hackage.haskell.org/package/"$pkg"/"$pkg".tar.gz > "$1"
+}
+
+function Tar.find() {
+    mkpdir "$1"
+    tar -tzf "$3" | grep -e "${2#-}" > "$1"
+}
+function Tar.get() {
+    mkpdir "$1"
+    tar -xzOf "$2" "$(< "$3")" > "$1"
+}
+
+function Cabal.section() {
+    local field="${2#-}"
+    mkpdir "$1"
+    local text="$(sed -rn '
+/^\s*--/d
+/^library/I,/^\S/{
+  /^\s+'"$field"':/I{
+    :loop;{
+      /^\s*--/{n;bloop}
+      /'"$field"':/Ibnext-line
+      /^\S|:|\bif\b/bendloop
+      :next-line
+      s/'"$field"'://i;p;n
+      bloop
+    }
+    :endloop	
+  }
+}
+' "$3")" || return
+    if [ -n "$4" ]; then
+	local IFS="$IFS${4#-}"
+    fi
+    printf "%s\n" $text > "$1"
+}
+
+function HS.GHCAutoConf() {
+    cat > "$1.c" <<EOF
+#include <stdio.h>
+#include <stdint.h>
+
+int main() {
+    printf("#define SIZEOF_WORD32      %d\n",sizeof(uint32_t));
+    printf("#define ALIGNMENT_WORD32   %d\n",sizeof(uint32_t));
+
+    printf("#define SIZEOF_INT8_T     %d\n",sizeof(int8_t));
+    printf("#define ALIGNMENT_INT8_T  %d\n",sizeof(int8_t));
+    printf("#define SIZEOF_INT16_T    %d\n",sizeof(int16_t));
+    printf("#define ALIGNMENT_INT16_T %d\n",sizeof(int16_t));
+    printf("#define SIZEOF_INT32_T    %d\n",sizeof(int32_t));
+    printf("#define ALIGNMENT_INT32_T %d\n",sizeof(int32_t));
+    printf("#define SIZEOF_INT64_T    %d\n",sizeof(int64_t));
+    printf("#define ALIGNMENT_INT64_T %d\n",sizeof(int64_t));
+
+    printf("#define SIZEOF_UINT8_T     %d\n",sizeof(uint8_t));
+    printf("#define ALIGNMENT_UINT8_T  %d\n",sizeof(uint8_t));
+    printf("#define SIZEOF_UINT16_T    %d\n",sizeof(uint16_t));
+    printf("#define ALIGNMENT_UINT16_T %d\n",sizeof(uint16_t));
+    printf("#define SIZEOF_UINT32_T    %d\n",sizeof(uint32_t));
+    printf("#define ALIGNMENT_UINT32_T %d\n",sizeof(uint32_t));
+    printf("#define SIZEOF_UINT64_T    %d\n",sizeof(uint64_t));
+    printf("#define ALIGNMENT_UINT64_T %d\n",sizeof(uint64_t));
+
+    printf("#define SIZEOF_VOID_P      %d\n",sizeof(void*));
+    printf("#define ALIGNMENT_VOID_P   %d\n",sizeof(void*));
+
+    printf("#define SIZEOF_FLOAT       %d\n",sizeof(float));
+    printf("#define ALIGNMENT_FLOAT    %d\n",sizeof(float));
+    printf("#define SIZEOF_DOUBLE      %d\n",sizeof(double));
+    printf("#define ALIGNMENT_DOUBLE   %d\n",sizeof(double));
+
+    printf("#define SIZEOF_INT        %d\n",sizeof(int));
+    printf("#define ALIGNMENT_INT     %d\n",sizeof(int));
+    printf("#define SIZEOF_LONG       %d\n",sizeof(long));
+    printf("#define ALIGNMENT_LONG    %d\n",sizeof(long));
+    printf("#define SIZEOF_LONG_LONG       %d\n",sizeof(long long));
+    printf("#define ALIGNMENT_LONG_LONG    %d\n",sizeof(long long));
+
+    return 0;
+}
+EOF
+    gcc "$1.c" -o "$1.x"
+    rm -f "$1.c"
+    "$1.x" > "$1"
+    rm -f "$1.x"
+}
+function HS.MachDeps() {
+    mkpdir "$1"
+    cat > "$1" <<EOF
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The University of Glasgow 2002
+ *
+ * Definitions that characterise machine specific properties of basic
+ * types (C & Haskell) of a target platform.
+ *
+ * NB: Keep in sync with HsFFI.h and StgTypes.h.
+ * NB: THIS FILE IS INCLUDED IN HASKELL SOURCE!
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   http://ghc.haskell.org/trac/ghc/wiki/Commentary/SourceTree/Includes
+ *
+ * ---------------------------------------------------------------------------*/
+
+#pragma once
+
+/* Don't allow stage1 (cross-)compiler embed assumptions about target
+ * platform. When ghc-stage1 is being built by ghc-stage0 is should not
+ * refer to target defines. A few past examples:
+ *  - https://ghc.haskell.org/trac/ghc/ticket/13491
+ *  - https://phabricator.haskell.org/D3122
+ *  - https://phabricator.haskell.org/D3405
+ *
+ * In those cases code change assumed target defines like SIZEOF_HSINT
+ * are applied to host platform, not target platform.
+ *
+ * So what should be used instead in STAGE=1?
+ *
+ * To get host's equivalent of SIZEOF_HSINT you can use Bits instances:
+ *    Data.Bits.finiteBitSize (0 :: Int)
+ *
+ * To get target's values it is preferred to use runtime target
+ * configuration from 'targetPlatform :: DynFlags -> Platform'
+ * record. A few wrappers are already defined and used throughout GHC:
+ *    wORD_SIZE :: DynFlags -> Int
+ *    wORD_SIZE dflags = pc_WORD_SIZE (sPlatformConstants (settings dflags))
+ *
+ * Hence we hide these macros from -DSTAGE=1
+ */
+#if !defined(STAGE) || STAGE >= 2
+
+/* Sizes of C types come from here... */
+#include "ghcautoconf.h"
+
+/* Sizes of Haskell types follow.  These sizes correspond to:
+ *   - the number of bytes in the primitive type (eg. Int#)
+ *   - the number of bytes in the external representation (eg. HsInt)
+ *   - the scale offset used by writeFooOffAddr#
+ *
+ * In the heap, the type may take up more space: eg. SIZEOF_INT8 == 1,
+ * but it takes up SIZEOF_HSWORD (4 or 8) bytes in the heap.
+ */
+
+#define SIZEOF_HSCHAR           SIZEOF_WORD32
+#define ALIGNMENT_HSCHAR        ALIGNMENT_WORD32
+
+#define SIZEOF_HSINT            SIZEOF_VOID_P
+#define ALIGNMENT_HSINT         ALIGNMENT_VOID_P
+
+#define SIZEOF_HSWORD           SIZEOF_VOID_P
+#define ALIGNMENT_HSWORD        ALIGNMENT_VOID_P
+
+#define SIZEOF_HSDOUBLE         SIZEOF_DOUBLE
+#define ALIGNMENT_HSDOUBLE      ALIGNMENT_DOUBLE
+
+#define SIZEOF_HSFLOAT          SIZEOF_FLOAT
+#define ALIGNMENT_HSFLOAT       ALIGNMENT_FLOAT
+
+#define SIZEOF_HSPTR            SIZEOF_VOID_P
+#define ALIGNMENT_HSPTR         ALIGNMENT_VOID_P
+
+#define SIZEOF_HSFUNPTR         SIZEOF_VOID_P
+#define ALIGNMENT_HSFUNPTR      ALIGNMENT_VOID_P
+
+#define SIZEOF_HSSTABLEPTR      SIZEOF_VOID_P
+#define ALIGNMENT_HSSTABLEPTR   ALIGNMENT_VOID_P
+
+#define SIZEOF_INT8             SIZEOF_INT8_T
+#define ALIGNMENT_INT8          ALIGNMENT_INT8_T
+
+#define SIZEOF_WORD8            SIZEOF_UINT8_T
+#define ALIGNMENT_WORD8         ALIGNMENT_UINT8_T
+
+#define SIZEOF_INT16            SIZEOF_INT16_T
+#define ALIGNMENT_INT16         ALIGNMENT_INT16_T
+
+#define SIZEOF_WORD16           SIZEOF_UINT16_T
+#define ALIGNMENT_WORD16        ALIGNMENT_UINT16_T
+
+#define SIZEOF_INT32            SIZEOF_INT32_T
+#define ALIGNMENT_INT32         ALIGNMENT_INT32_T
+
+#define SIZEOF_WORD32           SIZEOF_UINT32_T
+#define ALIGNMENT_WORD32        ALIGNMENT_UINT32_T
+
+#define SIZEOF_INT64            SIZEOF_INT64_T
+#define ALIGNMENT_INT64         ALIGNMENT_INT64_T
+
+#define SIZEOF_WORD64           SIZEOF_UINT64_T
+#define ALIGNMENT_WORD64        ALIGNMENT_UINT64_T
+
+#if !defined(WORD_SIZE_IN_BITS)
+#if SIZEOF_HSWORD == 4
+#define WORD_SIZE_IN_BITS       32
+#define WORD_SIZE_IN_BITS_FLOAT 32.0
+#else
+#define WORD_SIZE_IN_BITS       64
+#define WORD_SIZE_IN_BITS_FLOAT 64.0
+#endif
+#endif
+
+#if !defined(TAG_BITS)
+#if SIZEOF_HSWORD == 4
+#define TAG_BITS                2
+#else
+#define TAG_BITS                3
+#endif
+#endif
+
+#define TAG_MASK ((1 << TAG_BITS) - 1)
+
+#endif /* !defined(STAGE) || STAGE >= 2 */
+
+EOF
+}
+function HS.StdHeader() {
+    mkpdir "$1"
+    shopt -s globstar
+    cp "/usr/lib/ghc-$GHC_VERSION/"**"/include/"**"/${2#-}.h" "$1"
+}
+function HS.pp() {
+    mkpdir "$1"
+    cpp -traditional-cpp -undef -DWORLD_IMPORTS -I"$SETUP_ROOT$HS_POOL" -w -include "$3" "$2" > "$1"
+}
+function HS.cc() {
+    mkpdir "$1"
+    ghc -c -I"$SETUP_ROOT$HS_POOL" "$2" -o "$1"
+}
+function HS.depends() {
+    mkpdir "$1"
+    sed -rn '/\{-/{:loop;/-\}/!{N;bloop}};s/\{-.*-\}//;s/^import(\s+qualified)?\s+([A-Z][A-Za-z0-9_.]*).*$/\2/p' "$2" | grep -vxf "$3" > "$1" || :
+}
+function Choose() { "${2#-}" "$1" "${@:3}"; }
+function HS.get.args() {
+    local dst="$1"; shift
+    local mod="${1#-}" pkg="$(< "$2")" name="$(< "$3")"
+    mkpdir "$dst"
+    case "$name" in
+	*.hsc) printf "%s %s\n" -Copy "$HS_DEP/$mod.hsc_hs"
+               ;;
+	*.hs)  printf "%s %s %s\n" -Tar.get "$pkg" "/$3";;
+    esac > "$dst"
+}
+function HS.hsc() {
+    mkpdir "$1"
+    hsc2hs -o "$1" -I"$SETUP_ROOT$HS_POOL" -D_GNU_SOURCE -DWORLD_IMPORTS -i"$SETUP_ROOT/$3" "$2"
+}
+function HS.pkgMods() {
+    local pkg
+    mkpdir "$1"
+    for pkg in $(< "$2"); do
+	printf "%s\n" $(ghc-pkg field "$pkg" exposed-modules)
+    done | sort -u > "$1"
+}
+function HS.compile() {
+    mkpdir "$1" "$2"
+    ghc -optP --include="$4" -o "$1" -ohi "$2" -I"$SETUP_ROOT$HS_POOL" -i"$SETUP_ROOT$HS_OBJ" -c ${5:+$(< "$5")} "$3"
+}
+function HS.ld() {
+    mkpdir "$1"
+    local -a pkgs=( $(< "$2") )
+    local -a opts=( -hide-all-packages ${pkgs[@]/#/-package } )
+    
+    echo ghc "${opts[@]}" -o "$1" "${@:3}"
+    ghc "${opts[@]}" -o "$1" "${@:3}"
+}
+function HS.fullPkgs() {
+    local pkg vers
+    mkpdir "$1"
+    for pkg in $(< "$2"); do
+	vers="$(ghc-pkg field "$pkg" version)"
+	vers="${vers#version: }"
+	printf "%s\n" "$pkg-$vers"
+    done > "$1"
+}
+function HS.macros.genPkg() {
+    local pName vers a b c; local -a vns
+    pName="${1%-*}"
+    pName="${pName//-/_}"
+    vers="${1##*-}"
+    vns=( ${vers//./ } 0 0 )
+    a="${vns[0]}" ; b="${vns[1]}" ; c="${vns[2]}"
+    cat <<EOF
+#define VERSION_$pName "$vers"
+#undef MIN_VERSION_$pName
+#define MIN_VERSION_$pName(maj1,maj2,min) ( maj1 < $a || (maj1) == $a && (maj2) < $b || (maj1) == $a && (maj2) == $b && (min) <= $c )
+EOF
+}
+function HS.macros() {
+    echo HS.macros "$@"
+    local -a packages=( $(< "$2") $(< "$3") ) core_packages=( $(< "$4") )
+    mkpdir "$1"
+    {
+	cat <<EOF
+#ifndef __GLASGOW_HASKELL__
+#define __GLASGOW_HASKELL__ $GHC_VNUM
+#endif
+#define HASH_TOK #
+#define CALLCONV ccall
+#define USE_DLSYM 1
+#define IS_WINDOWS False
+#define DATA_DIR "$INSTALL/share/world"
+#define EXE_EXTENSION ""
+#define _FILE_OFFSET_BITS 64
+EOF
+	for p in "${packages[@]}"; do HS.macros.genPkg "$p"; done
+	echo "#if __GLASGOW_HASKELL__ < 800 || defined(WORLD_IMPORTS)"
+	for p in "${core_packages[@]}"; do HS.macros.genPkg "$p"; done
+	echo "#endif"
+    } > "$1"
+}
+function HS.includes() {
+    mkpdir "$1"
+    sed -rn 's,^\s*#\s*include\s*("(.*\.hs?)"|<(Hs.*\.h)>)\s*$,\2\3,p' "$2" \
+        | if [ -n "$3" ]; then grep -v "${3#-}"; else cat; fi > "$1"
+}
+
+function HS.isLocalMod() {
+    local modpath=( "$SETUP_ROOT$HS_SRC/"*/*"/source/$1."${2:-hs} )
+    [ -e "$modpath" ] && {
+	modpath="${modpath#$SETUP_ROOT$HS_SRC/}"
+	HS_MOD_PATH="${modpath%/source/*}"
+    }
+}
+
+function HS.source-dir() {
+    shopt -s globstar
+    
+    local src obj srcdir="$2" etcdir="${3:-etc}"
+
+    Setup.use Pkg
+    Pkg.name haskell/"$1"
+    prepare "$HS_PKG/$1/c-sources" = Empty
+    for src in "$srcdir"/**/*.hs; do
+	src="${src#$srcdir/}"
+	prepare "$HS_POOL/$src" = Copy "$srcdir/$src"
+	prepare "$HS_DEP/${src%.*}.pkg-name" = Echo -"$1"
+	prepare "$HS_DEP/${src%.*}.options.file" = Echo -"/${SETUP_PREFIX}$etcdir/options"
+    done
+}
+function Cabal.h-sources() {
+    local IFS="$IFS,"
+    local -a extra=( $(sed -n '/^extra-source-files:/I,/^\S/{s/^extra-source-files:/ /I;/^\S/d;p}' "$2") )
+    local -a idirs=( $(< "$3") )
+    local file dir
+    mkpdir "$1"
+    for file in "${extra[@]}"; do
+        for dir in "${idirs[@]}"; do
+            if [[ "$file" == "$dir"/*.h ]]; then
+                printf "%s\n" "${file#$dir/}"
+                break
+            fi
+        done
+    done > "$1"
+}
+
+Setup.hook HS.auto_files
+function HS.auto_files() {
+    [[ "$1" =~ ^("$HS_PKG"|"$HS_DEP"|"$HS_CONF"|"$HS_POOL"|"$HS_OBJ"|"$HS_BIN")/(.*) ]] && {
+	local root="${BASH_REMATCH[1]}" path="${BASH_REMATCH[2]}"
+	case "$root" in
+	    "$HS_CONF")
+		case "$path" in
+		    manifest.files)	prepare "$1" = Foreach -'$HS_PKG/$word/conf.manifest' "$(Config.param /haskell/packages)";;
+		    manifest)		prepare "$1" = Sorted @"$HS_CONF/manifest.files";;
+		    c-manifest.files)	prepare "$1" = Foreach -'$HS_PKG/$word/conf.c-manifest' "$(Config.param /haskell/packages)";;
+		    c-manifest)         prepare "$1" = Sorted @"$HS_CONF/c-manifest.files";;
+		    base-packages.full) prepare "$1" = HS.fullPkgs "$(Config.param /haskell/base-packages)";;
+		    base-modules)       prepare "$1" = HS.pkgMods "$(Config.param /haskell/base-packages)";;
+		    macros.h)           prepare "$1" = HS.macros "$(Config.param /haskell/packages)" "$(Config.param /haskell/local-packages)" "$HS_CONF/base-packages.full";;
+		esac;;
+	    "$HS_PKG")
+		if [ -e "$SETUP_ROOT$HS_SRC/$path" ]; then
+		    prepare "$1" = Copy "$HS_SRC/$path"
+		else
+		    [[ "$path" =~ ^([^/]*)/(package\.(tar\.gz|cabal(\.ar-path)?)|modules|conf.(c-)?manifest|(all-|other-|)extensions|(ext-|ghc-|)options|[ch]-sources|includes|include-dirs)$ ]] && {
+			local pkg="${BASH_REMATCH[1]}" file="${BASH_REMATCH[2]}"
+			case "$file" in
+			    package.tar.gz)	    prepare "$1" = Hackage.get -"$pkg";;
+			    package.cabal.ar-path)  prepare "$1" = Tar.find -"${pkg%-*}"'\.cabal$' "$HS_PKG/$pkg/package.tar.gz";;
+			    package.cabal)	    prepare "$1" = Tar.get "$HS_PKG/$pkg/package.tar.gz" "$HS_PKG/$pkg/package.cabal.ar-path";;
+			    modules)                prepare "$1" = Cabal.section -'(exposed|other)'-modules "$HS_PKG/$pkg/package.cabal" -',';;
+			    extensions)             prepare "$1" = Cabal.section -'(default-)?'extensions "$HS_PKG/$pkg/package.cabal" -,;;
+			    other-extensions)       prepare "$1" = Cabal.section -other-extensions "$HS_PKG/$pkg/package.cabal" -,;;
+			    c-sources)              prepare "$1" = Cabal.section -c-sources "$HS_PKG/$pkg/package.cabal" -,;;
+			    h-sources)              prepare "$1" = Cabal.h-sources "$HS_PKG/$pkg/"{package.cabal,include-dirs};;
+			    includes)               prepare "$1" = Cabal.section -'(includes|install-includes)' "$HS_PKG/$pkg/package.cabal" -,;;
+			    include-dirs)           prepare "$1" = Cabal.section -include-dirs "$HS_PKG/$pkg/package.cabal" -,;;
+			    all-extensions)         prepare "$1" = Concat "$HS_PKG/$pkg/"{other-,}extensions;;
+			    ghc-options)            prepare "$1" = Cabal.section -ghc-options "$HS_PKG/$pkg/package.cabal";;
+			    ext-options)            prepare "$1" = Foreach -'-X$word' "$HS_PKG/$pkg/extensions";;
+			    options)                prepare "$1" = Concat "$HS_PKG/$pkg/"{ext,ghc}-options;;
+			    conf.manifest)          prepare "$1" = Foreach -'$word:'"$pkg" "$HS_PKG/$pkg/modules";;
+			    conf.c-manifest)        prepare "$1" = Foreach -'$word:'"$pkg" "$HS_PKG/$pkg/c-sources" "$HS_PKG/$pkg/h-sources" "$HS_PKG/$pkg/includes";;
+			esac
+		    }
+		fi;;
+	    "$HS_DEP"|"$HS_POOL"|"$HS_OBJ")
+		[[ "$path" =~ ^(.*)\.((c-)?pkg-name|(c-)?pkg\.file|hs(c?\.ar-path|\.args|pp(\.files)?|(c(_hs)?)?)|depends|(c-)?o(\.(c-)?files)?|full-o\.files|hi|options\.file|full-deps(\.files)?|pkg-deps(\.files|\.local)?|[ch](-sources(\.files)?|\.ar-path|)|incs|full-incs(\.files)?|bin-(hs|c)-o\.files)$ ]] && {
+		    local mod="${BASH_REMATCH[1]}" ext="${BASH_REMATCH[2]}"
+		    case "$root:$ext"	in
+			"$HS_DEP":pkg-name)
+			    if HS.isLocalMod "$mod"; then
+				prepare "$1" = Echo -"${HS_MOD_PATH//\//-}"
+			    else
+				prepare "$1" = Lookup -"${mod//\//.}:" "$HS_CONF/manifest"
+			    fi;;
+			"$HS_DEP":c-pkg-name)   prepare "$1" = Lookup -"$mod" "$HS_CONF/c-manifest";;
+			"$HS_DEP":pkg.file)	prepare "$1" = Foreach -'$HS_PKG/$word/package.tar.gz' "$HS_DEP/$mod.pkg-name";;
+			"$HS_DEP":c-pkg.file)	prepare "$1" = Foreach -'$HS_PKG/$word/package.tar.gz' "$HS_DEP/$mod.c-pkg-name";;
+			"$HS_DEP":c.ar-path)    prepare "$1" = Tar.find -'\(^\|/\)'"$mod\\.c\$" @"$HS_DEP/$mod.c.c-pkg.file";;
+			"$HS_DEP":h.ar-path)    prepare "$1" = Tar.find -'\(^\|/\)'"$mod\\.h\$" @"$HS_DEP/$mod.h.c-pkg.file";;
+			"$HS_POOL":c)           prepare "$1" = Tar.get @"$HS_DEP/$mod.c-pkg.file" "$HS_DEP/$mod.c.ar-path";;
+			"$HS_POOL":h)
+			    case "$mod" in
+                                HsBase*|rts/*|Rts*|Stg*|HsFFI|stg/*|ghcconfig|ghcplatform|MachRegs|WCsubst)
+                                    prepare "$1" = HS.StdHeader -"$mod";;
+				MachDeps)    prepare "$1" = HS.MachDeps;;
+				ghcautoconf) prepare "$1" = HS.GHCAutoConf;;
+				*)           prepare "$1" = Tar.get @"$HS_DEP/$mod.c-pkg.file" "$HS_DEP/$mod.h.ar-path"
+			    esac;;
+
+                        "$HS_DEP":hs.ar-path)	prepare "$1" = Tar.find -"$mod\\.hsc\\?\$" @"$HS_DEP/$mod.pkg.file";;
+                        "$HS_DEP":hs.args)	prepare "$1" = HS.get.args -"$mod" "$HS_DEP/$mod."{pkg.file,hs.ar-path};;
+                        "$HS_DEP":hsc_hs)	prepare "$1" = HS.hsc "$HS_POOL/$mod.hsc" "$HS_CONF/macros.h" @"$HS_DEP/$mod.hsc.full-incs"'{"$HS_POOL/$word"}';;
+			"$HS_POOL":hs)
+			    if HS.isLocalMod "$mod"; then
+				prepare "$1" = Copy "$HS_SRC/$HS_MOD_PATH/source/$mod.hs"
+ 			    else
+				prepare "$1" = Choose @"$HS_DEP/$mod.hs.args"
+			    fi;;
+
+                        "$HS_POOL":hsc)
+                            if HS.isLocalMod "$mod" hsc; then
+				prepare "$1" = Copy "$HS_SRC/$HS_MOD_PATH/source/$mod.hsc"
+ 			    else
+				prepare "$1" = Tar.get @"$HS_DEP/$mod.pkg.file" "$HS_DEP/$mod.hs.ar-path"
+			    fi;;
+                        "$HS_DEP":hspp.files)           prepare "$1" = Foreach -'$HS_POOL/$word' "$HS_DEP/$mod.hs.full-incs";;
+			"$HS_POOL":hspp)		prepare "$1" = HS.pp "$HS_POOL/$mod.hs" "$HS_CONF/macros.h" @"$HS_DEP/$mod.hspp.files";;
+			"$HS_DEP":depends)		prepare "$1" = HS.depends "$HS_POOL/$mod.hspp" "$HS_CONF/base-modules";;
+			"$HS_DEP":pkg-deps.files)	prepare "$1" = Foreach -'$HS_DEP/${word//.//}.pkg-deps' "$HS_DEP/$mod.depends";;
+			"$HS_DEP":pkg-deps)		prepare "$1" = Sorted "$HS_DEP/$mod.pkg-name" @"$HS_DEP/$mod.pkg-deps.files";;
+			"$HS_DEP":pkg-deps.local)	prepare "$1" = Filter "$HS_DEP/$mod.pkg-deps" "$(Config.param /haskell/local-packages)" -v;;
+			"$HS_DEP":full-deps.files)	prepare "$1" = Foreach -'$HS_DEP/${word//.//}.full-deps' "$HS_DEP/$mod.depends";;
+			"$HS_DEP":full-deps)		prepare "$1" = Sorted "$HS_DEP/$mod.depends" @"$HS_DEP/$mod.full-deps.files";;
+			"$HS_DEP":incs)			prepare "$1" = HS.includes "$HS_POOL/$mod";;
+			"$HS_DEP":full-incs.files)	prepare "$1" = Foreach -'$HS_DEP/$word.full-incs' "$HS_DEP/$mod.incs";;
+			"$HS_DEP":full-incs)		prepare "$1" = Sorted "$HS_DEP/$mod.incs" @"$HS_DEP/$mod.full-incs.files";;
+			"$HS_DEP":c-sources.files)	prepare "$1" = Foreach -'$HS_PKG/$word/c-sources' "$HS_DEP/$mod.pkg-deps.local";;
+			"$HS_DEP":c-sources)		prepare "$1" = Sorted @"$HS_DEP/$mod.c-sources.files";;
+			"$HS_DEP":o.c-files)		prepare "$1" = Foreach -'$HS_OBJ/${word#$HS_POOL/}-o' "$HS_DEP/$mod.c-sources";;
+			"$HS_DEP":o.files)		prepare "$1" = Foreach -'$HS_OBJ/${word//.//}.o' "$HS_DEP/$mod.depends";;
+
+			"$HS_DEP":options.file)
+			    if HS.isLocalMod "$mod"; then
+				prepare "$1" = Echo -"$HS_SRC/$HS_MOD_PATH/options"
+			    else
+				prepare "$1" = Foreach -'$HS_PKG/$word/options' "$HS_DEP/$mod.pkg-name"
+			    fi;;
+			"$HS_DEP":c-o.files)       prepare "$1" = Foreach -'$HS_POOL/$word' "$HS_DEP/$mod.c.full-incs";;
+			"$HS_OBJ":c-o)             prepare "$1" = HS.cc "$HS_POOL/$mod.c" @"$HS_DEP/$mod.c-o.files";;
+			"$HS_OBJ":o)               prepare "$1" "${1/.o/.hi}" = HS.compile "$HS_POOL/$mod.hs" "$HS_CONF/macros.h" @"$HS_DEP/$mod.options.file" @"$HS_DEP/$mod.o.files" @"$HS_DEP/$mod.o.c-files";;
+
+			"$HS_DEP":bin-hs-o.files)  prepare "$1" = Foreach -'$HS_OBJ/${word//.//}.o' "$HS_DEP/$mod.full-deps";;
+			"$HS_DEP":bin-c-o.files)   prepare "$1" = Foreach -'$(word="${word#$HS_POOL/}"; echo "$HS_OBJ/$word-o")' "$HS_DEP/$mod.c-sources";;
+			*) return 1;;
+		    esac
+		};;
+	    "$HS_BIN") prepare "$1" = HS.ld "$(Config.param /haskell/base-packages)" "$HS_OBJ/${path//.//}.o" @"$HS_DEP/${path//.//}.bin-"{c,hs}"-o.files";;
+	esac
+    }    
+}

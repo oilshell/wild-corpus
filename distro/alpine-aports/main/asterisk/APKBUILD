@@ -1,0 +1,237 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Contributor: Timo Teras <timo.teras@iki.fi>
+# Maintainer: Timo Teras <timo.teras@iki.fi>
+pkgname=asterisk
+pkgver=14.6.2
+pkgrel=0
+pkgdesc="Asterisk: A Module Open Source PBX System"
+pkgusers="asterisk"
+pkggroups="asterisk"
+url="http://www.asterisk.org/"
+arch="all"
+license="GPL2"
+depends=
+makedepends="autoconf automake libtool findutils tar wget bsd-compat-headers
+	ncurses-dev popt-dev newt-dev zlib-dev libedit-dev tiff-dev curl-dev
+	libressl-dev lua-dev libcap-dev jansson-dev util-linux-dev
+	sqlite-dev postgresql-dev unixodbc-dev freetds-dev mariadb-dev
+	alsa-lib-dev pjproject-dev dahdi-tools-dev libpri-dev libsrtp-dev
+	spandsp-dev libresample speex-dev speexdsp-dev libogg-dev
+	bluez-dev libxml2-dev imap-dev"
+install="$pkgname.pre-install $pkgname.pre-upgrade"
+subpackages="$pkgname-dbg $pkgname-dev $pkgname-doc $pkgname-pgsql $pkgname-odbc
+	$pkgname-tds $pkgname-fax $pkgname-sample-config:sample:noarch
+	$pkgname-sounds-moh:sound_moh:noarch $pkgname-sounds-en:sound_en:noarch
+	$pkgname-mobile $pkgname-curl:_curl $pkgname-srtp $pkgname-dahdi
+	$pkgname-speex $pkgname-alsa $pkgname-cdr-mysql:cdr_mysql"
+
+_download="http://downloads.asterisk.org/pub/telephony/asterisk/releases"
+source="$_download/asterisk-$pkgver.tar.gz
+	http://dev.alpinelinux.org/~tteras/asterisk-addon-mp3-r201.patch.gz
+	ASTERISK-24517.patch
+	musl-mutex-init.patch
+	restore-multihomed-module.patch
+
+	asterisk.initd
+	asterisk.confd
+	asterisk.logrotate"
+
+builddir="$srcdir/$pkgname-${pkgver/_/-}"
+
+prepare() {
+	default_prepare || return 1
+
+	# asteriskssl does not have direct references to libssl, but looks up
+	# symbols from it using dlsym(RTLD_NEXT), so use --no-as-needed for it.
+	sed -i -e 's/ASTSSL_LIBS:=$(OPENSSL_LIB)/ASTSSL_LIBS:=-Wl,--no-as-needed $(OPENSSL_LIB) -Wl,--as-needed/g' main/Makefile
+
+	sed -i -e 's:lua5.1/::' pbx/pbx_lua.c
+	sed -i -e 's/int foo = res_ninit(NULL);/res_ninit_is_not_really_here();/g' configure.ac
+
+	./bootstrap.sh
+}
+
+build() {
+	cd "$builddir"
+	SHA1SUM="$PWD"/build_tools/sha1sum-sh ./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--libdir=/usr/lib \
+		--localstatedir=/var \
+		--disable-xmldoc \
+		--with-gsm=internal \
+		--with-popt \
+		--with-z \
+		--with-newt \
+		--with-unixodbc \
+		--with-postgres \
+		--with-tds \
+		--with-dahdi \
+		--with-pri \
+		--with-tonezone \
+		--with-resample \
+		--with-sqlite3 \
+		--with-speex \
+		--with-asound \
+		--without-x11 \
+		--with-spandsp \
+		--with-bluetooth \
+		--with-libcurl \
+		--with-libedit \
+		--with-srtp \
+		--with-imap=system \
+		|| return 1
+
+	# get default modules to build
+	rm -f menuselect.makeopts
+	make menuselect.makeopts
+
+	# and add the non-default modules we need
+	./menuselect/menuselect \
+		--enable chan_mobile \
+		--enable app_meetme \
+		--enable cdr_mysql \
+		--disable BUILD_NATIVE \
+		--enable IMAP_STORAGE \
+		menuselect.makeopts
+
+	# build
+	make ASTCFLAGS="$CFLAGS" ASTLDFLAGS="$LDFLAGS" LDCONFIG= || return 1
+}
+
+package() {
+	cd "$builddir"
+	make -j1 DESTDIR="$pkgdir" LDCONFIG_FLAGS="-n" install || return 1
+
+	install -d "$pkgdir"/var/run/asterisk
+	install -d "$pkgdir"/var/lib/asterisk
+
+	install -m755 -D "$srcdir"/$pkgname.initd "$pkgdir"/etc/init.d/$pkgname
+	install -m644 -D "$srcdir"/$pkgname.confd "$pkgdir"/etc/conf.d/$pkgname
+	install -m644 -D "$srcdir"/$pkgname.logrotate \
+		"$pkgdir"/etc/logrotate.d/$pkgname
+
+	chown -R asterisk:asterisk "$pkgdir"/var/*/asterisk
+	chown -R asterisk:asterisk "$pkgdir"/etc/asterisk
+	chmod -R u=rwX,g=rX,o= "$pkgdir"/etc/asterisk
+}
+
+_move_dir() {
+	for DIR in "$@"; do
+		local dest=`dirname "$subpkgdir/$DIR"`
+		echo mkdir -p $dest
+		mkdir -p "$dest"
+		echo mv "$pkgdir"/$DIR $dest
+		mv "$pkgdir"/"$DIR" "$dest"
+	done
+}
+
+_find_and_move() {
+	local pattern="$1"
+	cd "$pkgdir" || return 1
+	find . -name "$pattern" -type f | while read f; do
+		local dest="$subpkgdir/${f%/*}"
+		mkdir -p "$dest"
+		mv "$f" "$dest"
+	done
+}
+
+doc() {
+	default_doc
+}
+
+dev() {
+	default_dev
+	depends="asterisk"
+
+	# move back the /usr/lib/libasteriskssl.so symlink, asterisk needs it
+	# see http://bugs.alpinelinux.org/issues/6393
+	mv "$subpkgdir"/usr/lib/libasteriskssl.so "$pkgdir"/usr/lib/libasteriskssl.so || return 1
+}
+
+pgsql() {
+	depends=
+	install=
+	_find_and_move '*_pgsql*'
+}
+
+odbc() {
+	depends=
+	install=
+	_find_and_move '*odbc*'
+}
+
+tds() {
+	depends=
+	install=
+	_find_and_move '*_tds*'
+}
+
+fax() {
+        depends=
+        install=
+        _find_and_move '*_fax*'
+}
+
+mobile() {
+        depends=
+        install=
+        _find_and_move '*_mobile*'
+}
+
+_curl() {
+	depends=
+	install=
+	_find_and_move '*_curl*'
+}
+
+cdr_mysql() {
+	depends=
+	install=
+	_find_and_move '*cdr_mysql*'
+}
+
+srtp() { _find_and_move '*_srtp*'; }
+dahdi() { _find_and_move '*_dahdi*'; }
+speex() { _find_and_move '*_speex*'; }
+alsa() { _find_and_move '*_alsa*'; }
+
+sample() {
+	pkgdesc="Sample configuration files for asterisk"
+	cd "$builddir"
+	mkdir -p "$subpkgdir"/var/lib/asterisk/phoneprov
+	make -j1 samples DESTDIR="$subpkgdir"
+
+	chown -R asterisk:asterisk "$subpkgdir"/var/*/asterisk
+	chown -R asterisk:asterisk "$subpkgdir"/etc/asterisk
+	chmod -R u=rwX,g=rX,o= "$subpkgdir"/etc/asterisk
+}
+
+sound_moh() {
+	pkgdesc="Default on-hold music files for asterisk"
+	depends=
+	install=
+	_move_dir var/lib/asterisk/moh
+	chown -R asterisk:asterisk "$subpkgdir"/var/*/asterisk
+}
+
+sound_en() {
+	pkgdesc="English sound files for asterisk"
+	depends=
+	install=
+	_move_dir var/lib/asterisk/sounds/en
+	chown -R asterisk:asterisk "$subpkgdir"/var/*/asterisk
+}
+
+sha512sums="31889a31779ffd9d7d30568ecb824f2f091b022c7e0e6229921acf7aa84efd80f3d9aaba7faff521064a1fce7509de0c3e149f04cc69941b2f68f62c0e9e8f9a  asterisk-14.6.2.tar.gz
+aacef3f4796fb1abd33266998b53909cb4b36e7cc5ad2f7bac68bdc43e9a9072d9a4e2e7e681bddfa31f3d04575eb248afe6ea95da780c67e4829c1e22adfe1b  asterisk-addon-mp3-r201.patch.gz
+9230141ea4690db30cc1825d67f495a7357f13ee11da7e5a7c6696f3ae9edd599214c2d6915f6ad64f2bc68c754cda140db3f570ba051399ff894ab26b5db31c  ASTERISK-24517.patch
+f72c2e04de80d3ed9ce841308101383a1655e6da7a3c888ad31fffe63d1280993e08aefcf8e638316d439c68b38ee05362c87503fca1f36343976a01af9d6eb1  musl-mutex-init.patch
+935c25c7b1cdbd376056e20232a0e8c38dd32c344f50306d99930bf7cb37685c31329ead273b08ac9ab76daa9386adfb05b57440e46a39cb80e5542d65e8e3ed  restore-multihomed-module.patch
+0044c5db468ec8f2385d18d476f89976f6d036448583a4ef8017ce7a6f8f72105337e6b20037ffe47f561d2877fc9c86720aef23ab037df89b36dc140a5924c4  asterisk.initd
+ab6b6f08ff43268cbb1abb7ed7d678949991ba495682a644bbaeb017d6adbff0a43297905fd73ae8db1786a28d5b5904f1bc253209a0e388c8a27f26c6ce14ed  asterisk.confd
+7591d2faf539d05d9ee4e431c78a5e20686721fd79221ad94dffeeaff9282220b09cb9aec214bd7a8d12affaec0276c9c91e6e21af8b6712c0a9502b60b02f2b  asterisk.logrotate"

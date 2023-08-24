@@ -1,0 +1,35 @@
+# Contributor: Alan Lacerda <alacerda@alpinelinux.org>
+# Maintainer: Paul Morgan <jumanjiman@gmail.com>
+pkgname=duo_unix
+pkgver=1.10.1
+pkgrel=0
+pkgdesc="duosecurity.com two-factor authentication"
+url="https://duo.com/support/documentation/duounix"
+arch="all"
+license="GPL2"
+depends=""
+depends_dev="libressl-dev zlib-dev"
+makedepends="$depends_dev"
+options="suid"
+subpackages="$pkgname-dev $pkgname-doc"
+source="https://dl.duosecurity.com/$pkgname-$pkgver.tar.gz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc/duo \
+		--mandir=/usr/share/man \
+		--localstatedir=/var
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="45e246e7665e8d9c70ce43eed632371b079e9aec20f6c5d771a7d1de80a0f75d987fb88002de719358511d92d05b27824e539af53836af75a0939e59aae37359  duo_unix-1.10.1.tar.gz"

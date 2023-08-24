@@ -1,0 +1,53 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Contributor: Michael Mason <ms13sp@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=coreutils
+pkgver=8.27
+pkgrel=0
+pkgdesc="The basic file, shell and text manipulation utilities"
+url="http://www.gnu.org/software/coreutils/"
+arch="all"
+license="GPL3+"
+makedepends="bash acl-dev perl"
+subpackages="$pkgname-doc"
+install="$pkgname.post-deinstall"
+source="http://ftp.gnu.org/gnu/coreutils/$pkgname-$pkgver.tar.xz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	LIBS="-lrt" ./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--disable-nls \
+		--without-gmp \
+		--enable-no-install-program=hostname,su,kill,uptime \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+
+	rm -rf "$pkgdir"/usr/lib/charset.alias
+	rmdir -p "$pkgdir"/usr/lib 2>/dev/null || true
+
+	install -d "$pkgdir"/bin "$pkgdir"/usr/sbin
+	cd "$pkgdir"/usr/bin/
+
+	# binaries that busybox puts in /bin
+	mv base64 cat chgrp chmod chown cp date dd df 'echo' false ln ls \
+		mkdir mknod mktemp mv nice printenv pwd rm rmdir sleep stat \
+		stty sync touch true uname \
+		"$pkgdir"/bin
+
+	mv chroot "$pkgdir"/usr/sbin/
+}
+
+sha512sums="abf3280aaa54e9bd5851df0eda2af1de1017ca174633e52d1e592455d46ea0e99812dda46d2f320e979553cef271485d8818c595bba6ed31264511a511c93679  coreutils-8.27.tar.xz"

@@ -1,0 +1,35 @@
+# Contributor: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+# Maintainer: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+pkgname=py-factory-boy
+pkgver=2.9.2
+pkgrel=0
+pkgdesc="A verstile test fixtures replacement based on thoughtbot's factory_girl for Ruby"
+url=https://github.com/rbarrois/factory_boy
+arch=noarch
+license=MIT
+depends=
+makedepends=py-setuptools
+source="https://files.pythonhosted.org/packages/source/f/factory_boy/factory_boy-$pkgver.tar.gz"
+
+_builddir=$srcdir/factory_boy-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	./setup.py build
+}
+
+package() {
+	cd "$_builddir"
+	./setup.py install --root "$pkgdir"
+}
+
+sha512sums="5e835ea3fd8561c4e1ef31f291844826678c0adf399608cdd7fe35f6a7f966040d5c9e1221ec86e2e6f9d342ece299f90ab03ac2f1e6853a2ec25f395f8de1a2  factory_boy-2.9.2.tar.gz"

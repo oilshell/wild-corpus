@@ -1,0 +1,33 @@
+# Contributor: Gennady Feldman <gena01@gmail.com>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=envconsul
+pkgver=0.6.2
+pkgrel=0
+pkgdesc="Read and set environmental variables for processes from Consul."
+url="https://www.consul.io/"
+arch="all"
+license="MPL-2.0"
+depends=""
+makedepends="go"
+options="!strip"
+source="$pkgname-$pkgver.tar.gz::https://github.com/hashicorp/$pkgname/archive/v$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	mkdir -p "$builddir/src/github.com/hashicorp"
+	ln -s "$builddir" "$builddir/src/github.com/hashicorp/$pkgname"
+	cd "$builddir/src/github.com/hashicorp/$pkgname" || return 1
+
+	GOPATH="$builddir" go build -v -o bin/$pkgname
+}
+
+package() {
+	cd "$builddir"
+
+	# Main binary
+	install -m755 -D bin/$pkgname "$pkgdir"/usr/bin/$pkgname
+}
+
+sha512sums="2e943f9ce40adf32b9b882a6a4e57cec2f2b3fcd63d207c99d79e00851287cf3ca9a398e0bab425f53887be01b5decd93171c1efa59fc485cbc5ebc4588e6678  envconsul-0.6.2.tar.gz"

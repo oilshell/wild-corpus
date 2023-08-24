@@ -1,0 +1,40 @@
+# Contributor: Thomas Boerger <thomas@webhippie.de>
+# Maintainer: Thomas Boerger <thomas@webhippie.de>
+pkgname=hugo
+pkgver=0.27.1
+pkgrel=0
+pkgdesc="A Fast and Flexible Static Site Generator built with love in GoLang"
+url="http://gohugo.io/"
+arch="all"
+license="Apache 2.0"
+depends=""
+makedepends="go govendor"
+install=""
+source="${pkgname}-${pkgver}.tar.gz::https://github.com/gohugoio/hugo/archive/v$pkgver.tar.gz"
+builddir="$srcdir/src/github.com/gohugoio/$pkgname"
+
+prepare() {
+	mkdir -p ${builddir%/*}
+	mv "$srcdir"/$pkgname-$pkgver "$builddir"/ || return 1
+	default_prepare
+}
+
+build() {
+	cd "$builddir"
+	export GOPATH="$srcdir"
+	govendor sync -v || return 1
+	go build -v -o bin/$pkgname || return 1
+}
+
+check() {
+	rm -f $builddir/releaser/git_test.go
+	cd "$builddir"
+	export GOPATH="$srcdir"
+	govendor test +local || return 1
+}
+
+package() {
+	install -Dm755 "$builddir"/bin/$pkgname "$pkgdir"/usr/bin/$pkgname
+}
+
+sha512sums="4ff1e9379a33e4758c8f4d46e38d882095f33da019dac950461e7a85ac19174be32f2d2acc09640f99b232c1fb882059c659619c350a0dcbe07dd5dbf0fdf1ad  hugo-0.27.1.tar.gz"

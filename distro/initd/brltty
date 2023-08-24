@@ -1,0 +1,88 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          brltty
+# Required-Start:    mountkernfs
+# Required-Stop:     
+# Should-Start:      udev
+# Should-Stop:
+# Default-Start:     S
+# Default-Stop:
+# Short-Description: Braille terminal driver 
+# Description: Used to provide access to refreshable braille terminals.
+### END INIT INFO
+
+set -e
+
+DAEMON=/sbin/brltty
+NAME=brltty
+DESC='Braille terminal driver'
+
+test -f $DAEMON || exit 0
+
+# /etc/brltty.conf may need to be propagated from the initramfs. (This is a
+# pretty awful hack.)
+if [ -e /dev/.initramfs/brltty.conf ] && [ -e /etc/default/brltty ]; then
+	mv /dev/.initramfs/brltty.conf /etc/brltty.conf
+	sed -i -e 's/^RUN_BRLTTY=.*/RUN_BRLTTY=yes/' /etc/default/brltty
+fi
+
+[ -r /etc/default/brltty ] && . /etc/default/brltty
+
+# Edit /etc/default/brltty and set RUN_BRLTTY=yes to allow brltty to be
+# started.
+if [ "$RUN_BRLTTY" != yes ]; then
+	exit 0
+fi
+
+set -e
+
+[ -r /etc/default/locale ] && . /etc/default/locale
+[ -n "$LANG" ] && export LANG
+
+. /lib/lsb/init-functions
+
+case "$1" in
+  start)
+	if [ "$RUNLEVEL" = "S" -a "$PREVLEVEL" = "N" ]; then
+		if [ "$START_IN_INITRAMFS" = "true" -o "$START_IN_INITRAMFS" = "yes" ]; then
+			if $0 status >/dev/null; then
+				$0 stop
+			else
+				log_warning_msg 'BRLTTY was not running, did you forget to invoke "update-initramfs -u"?'
+			fi
+		fi
+	fi
+	log_daemon_msg "Starting $DESC" "$NAME"
+	if start-stop-daemon --start --oknodo --exec $DAEMON -- $ARGUMENTS; then
+	    log_end_msg 0
+	else
+	    log_end_msg 1
+	fi
+	;;
+  stop)
+	log_daemon_msg "Stopping $DESC" "$NAME"
+	if start-stop-daemon --stop --quiet --oknodo --retry 5 --exec $DAEMON; then
+	    log_end_msg 0
+	else
+	    log_end_msg 1
+	fi
+	;;
+  restart|force-reload)
+	log_daemon_msg "Restarting $DESC" "$NAME"
+	start-stop-daemon --stop --quiet --retry 5 --exec $DAEMON
+	if start-stop-daemon --start --quiet --exec $DAEMON -- $ARGUMENTS; then
+	    log_end_msg 0
+	else
+	    log_end_msg 1
+	fi
+	;;
+  status)
+        status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
+        ;;
+  *)
+	echo "Usage: /etc/init.d/$NAME {start|stop|restart|force-reload|status}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

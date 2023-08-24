@@ -1,0 +1,54 @@
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+pkgname=lua-toml
+pkgver=1.0.1
+pkgrel=0
+pkgdesc="TOML decoder/encoder for Lua"
+url="https://github.com/jonstoler/lua-toml"
+arch="noarch"
+license="Happy"
+depends=""
+checkdepends="lua-busted"
+source="$pkgname-$pkgver.tar.gz::https://github.com/jonstoler/$pkgname/archive/v$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+# luajit is not available for selected arches
+case "$CARCH" in
+	ppc64le | s390x) _luajit="";;
+	*) checkdepends="$checkdepends luajit" _luajit="jit";;
+esac
+
+_luaversions="5.1 5.2 5.3"
+for _v in $_luaversions; do
+	subpackages="$subpackages lua$_v-${pkgname#lua-}:_subpackage"
+	checkdepends="$checkdepends lua$_v"
+done
+
+check() {
+	cd "$builddir"
+
+	local lver; for lver in $_luaversions $_luajit; do
+		msg "Testing on lua$lver"
+		lua$lver /usr/bin/busted || return 1
+	done
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_subpackage() {
+	local lver="${subpkgname:3:3}"
+	pkgdesc="$pkgdesc $lver"
+	depends="lua$lver"
+	install_if="$pkgname=$pkgver-r$pkgrel lua$lver"
+	local rockdir="$subpkgdir/usr/lib/luarocks/rocks-$lver/$_pkgname/$pkgver-0"
+
+	cd "$builddir"
+	install -m 644 -D toml.lua "$subpkgdir"/usr/share/lua/$lver/toml.lua
+
+	mkdir -p "$rockdir"
+	echo 'rock_manifest = {}' > "$rockdir"/rock_manifest
+}
+
+sha512sums="84b8187e24e3e03b31bd9662faceaf6e59e4f15ad63d17a077ed158ee73710297be4ee0d1e503c2d06304bbca100bcf6ff0b92ef58d7accd834e014ac4972add  lua-toml-1.0.1.tar.gz"

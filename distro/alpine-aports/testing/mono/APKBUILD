@@ -1,0 +1,73 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Contributor: blattersturm <peachypies@protonmail.ch>
+# Maintainer:
+pkgname=mono
+pkgver=5.2.0.224
+pkgrel=0
+pkgdesc="Free implementation of the .NET platform including runtime and compiler"
+url="http://www.mono-project.com/"
+arch="x86_64 x86"
+license="GPL"
+depends="python2"
+depends_dev="zlib-dev libgdiplus-dev"
+makedepends="$depends_dev python2 linux-headers paxmark autoconf automake libtool cmake"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+source="http://download.mono-project.com/sources/mono/mono-${pkgver/_/~}.tar.bz2"
+builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	default_prepare
+	cd "$builddir"
+
+	# Remove hardcoded lib directory from the config.
+	sed -i 's|$mono_libdir/||g' data/config.in
+
+	# We need to do this so it don't get killed in the build proces when
+	# MPROTECT and RANDMMAP is enable.
+	sed -i '/exec "/ i\paxmark mr "$(readlink -f "$MONO_EXECUTABLE")"' \
+		runtime/mono-wrapper.in
+}
+
+build() {
+	cd "$builddir"
+
+	# Based on Fedora and SUSE package.
+	export CFLAGS="$CFLAGS -fno-strict-aliasing"
+
+	# Set the minimum arch for x86 to prevent atomic linker errors.
+	[ "$CARCH" = "x86" ] && export CFLAGS="$CFLAGS -march=i586 -mtune=generic"
+
+	# Run autogen to fix supplied configure linker issues with make install.
+	./autogen.sh \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--disable-rpath \
+		--disable-boehm \
+		--enable-parallel-mark \
+		--with-mcs-docs=no \
+		--without-sigaltstack
+	make
+}
+
+package() {
+	cd "$builddir"
+
+	make -j1 DESTDIR="$pkgdir" install
+	paxmark mr "$pkgdir"/usr/bin/mono-sgen
+
+	cd "$pkgdir"
+
+	# Remove .la files.
+	rm ./usr/lib/*.la
+
+	# Remove Windows-only stuff.
+	rm -r ./usr/lib/mono/*/Mono.Security.Win32*
+	rm ./usr/lib/libMonoSupportW.*
+}
+
+sha512sums="914ab11c892f6e59c1a89d92eb4b130a62ea606691820f9d9f48a2a68f7de3e593c233be071cd37ad5d817c5f5fda6892f89f1b0985fc44de97c1297300c706b  mono-5.2.0.224.tar.bz2"

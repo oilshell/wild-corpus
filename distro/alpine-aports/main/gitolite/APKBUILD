@@ -1,0 +1,32 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Maintainer:	Łukasz Jendrysik <scadu@yandex.com>
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+pkgname=gitolite
+pkgver=3.6.7
+pkgrel=0
+pkgdesc="Centralized git server, with very fine-grained access control and many powerful features"
+url="http://github.com/sitaramc/gitolite"
+arch="noarch"
+license="GPL2"
+depends="git perl"
+install=$pkgname.pre-install
+pkgusers="git"
+pkggroups="git"
+source="gitolite-$pkgver.tar.gz::https://github.com/sitaramc/$pkgname/archive/v${pkgver}.tar.gz"
+
+prepare() {
+	cd "$srcdir"/$pkgname-$pkgver
+	echo $pkgver > VERSION
+}
+
+package() {
+	install -d "$pkgdir"/usr/bin
+	install -d "$pkgdir"/usr/lib/gitolite
+
+	cd "$srcdir"/$pkgname-$pkgver
+	./install -to "$pkgdir"/usr/lib/gitolite
+	ln -s /usr/lib/gitolite/gitolite "$pkgdir"/usr/bin/
+	install -o git -g git -d -m 700 "$pkgdir"/var/lib/git
+}
+
+sha512sums="d22bf5c34834f82df771e6d4527496a302da312f7f78dfe81c1284f5a1ea05de90ec217e03e94918d69a006a72fa16dc0006b1f555826ad6183d9dce2dd9d425  gitolite-3.6.7.tar.gz"

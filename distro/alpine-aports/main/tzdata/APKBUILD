@@ -1,0 +1,60 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=tzdata
+pkgver=2017b
+_tzcodever=2017a
+_ptzver=0.5
+pkgrel=0
+pkgdesc="Timezone data"
+url="https://www.iana.org/time-zones"
+arch="all"
+license="Public Domain"
+depends=""
+depends_dev=""
+makedepends=""
+install=""
+subpackages="$pkgname-doc"
+source="http://www.iana.org/time-zones/repository/releases/tzcode$_tzcodever.tar.gz
+	http://www.iana.org/time-zones/repository/releases/tzdata$pkgver.tar.gz
+	http://dev.alpinelinux.org/archive/posixtz/posixtz-$_ptzver.tar.xz
+	0001-posixtz-fix-up-lseek.patch"
+
+builddir="$srcdir"
+_timezones="africa antarctica asia australasia europe northamerica \
+	southamerica pacificnew etcetera backward systemv factory"
+
+build() {
+	cd "$builddir"
+	make cc="${CC:-gcc}" CFLAGS="$CFLAGS -DHAVE_STDINT_H=1"
+		TZDIR="/usr/share/zoneinfo" || return 1
+
+	cd "$builddir"/posixtz-$_ptzver
+	make posixtz || return 1
+}
+
+package() {
+	cd "$builddir"
+
+	./zic -y ./yearistype -d "$pkgdir"/usr/share/zoneinfo ${_timezones}
+	./zic -y ./yearistype -d "$pkgdir"/usr/share/zoneinfo/right -L leapseconds ${_timezones}
+	#./zic -y ./yearistype -d "$pkgdir"/usr/share/zoneinfo/posix ${_timezones}
+
+	./zic -y ./yearistype -d "$pkgdir"/usr/share/zoneinfo -p America/New_York
+	install -m444 -t "$pkgdir"/usr/share/zoneinfo iso3166.tab zone1970.tab zone.tab
+
+	mkdir -p "$pkgdir"/usr/sbin
+	install -m755 zic zdump "$pkgdir"/usr/sbin || return 1
+
+	mkdir -p "$pkgdir"/usr/share/man/man8
+	install -m644 zic.8 zdump.8 "$pkgdir"/usr/share/man/man8 || return 1
+
+	rm -f "$pkgdir"/usr/share/zoneinfo/localtime || return 1
+	install -Dm755 "$srcdir"/posixtz-$_ptzver/posixtz \
+		"$pkgdir"/usr/bin/posixtz || return 1
+}
+
+sha512sums="36d744debd5263b6be39b3a9a146b7db1876f216a4bfc62b46631745861a9c03eda3220f213def86c724d3a11c41398c65c2e5d013ff2c1900e7bfc5e7844025  tzcode2017a.tar.gz
+3e090dba1f52e4c63b4930b28f4bf38b56aabd6728f23094cb5801d10f4e464f17231f17b75b8866714bf98199c166ea840de0787b75b2274aa419a4e14bbc4d  tzdata2017b.tar.gz
+68dbaab9f4aef166ac2f2d40b49366527b840bebe17a47599fe38345835e4adb8a767910745ece9c384b57af815a871243c3e261a29f41d71f8054df3061b3fd  posixtz-0.5.tar.xz
+f54ce213d74c5a8387e1a7c56299bc6eee65a035772288222128abc249a112067b8791b88b45c342b2d4d8d12e9e4f1f2f5c92c5de67f8b6413b1ebf1d7de467  0001-posixtz-fix-up-lseek.patch"

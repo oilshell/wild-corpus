@@ -1,0 +1,47 @@
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-netdisco
+_pkgname=netdisco
+pkgver=1.2.2
+pkgrel=0
+pkgdesc="Python library to scan local network for services and devices"
+url="https://github.com/home-assistant/netdisco/"
+arch="noarch"
+license="MIT"
+depends="py-zeroconf py-requests py-netifaces"
+makedepends="python2-dev py-setuptools python3-dev"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$_pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	depends="${depends//py-/py2-}"
+	_py python2
+}
+
+_py3() {
+	depends="${depends//py-/py3-}"
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+sha512sums="c84889c8636761c2b00091d8e2c980d917227f268b32789a23a2f01069a246eef26df2d3cbe56fe0bb34f211f0fd2967b22764e5cef91391fb36a8c3b5371488  netdisco-1.2.2.tar.gz"

@@ -1,0 +1,59 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Bartłomiej Piotrowski <bpiotrowski@alpinelinux.org>
+# Maintainer: Valery Kartel <valery.kartel@gmail.com>
+pkgname=wayland
+pkgver=1.14.0
+pkgrel=2
+pkgdesc="A computer display server protocol"
+url="http://wayland.freedesktop.org"
+arch=all
+license="MIT"
+depends="$pkgname-libs-client $pkgname-libs-cursor $pkgname-libs-server"
+depends_dev="libffi-dev expat-dev"
+makedepends="$depends_dev doxygen xmlto graphviz grep libxml2-dev bash"
+subpackages="$pkgname-dev $pkgname-libs-client:_libs
+	$pkgname-libs-cursor:_libs $pkgname-libs-server:_libs"
+source="http://wayland.freedesktop.org/releases/$pkgname-$pkgver.tar.xz"
+
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--disable-documentation \
+		--disable-static
+	make
+}
+
+check() {
+	cd "$builddir"
+#	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+dev() {
+	mkdir -p "$subpkgdir"/usr
+	mv "$pkgdir"/usr/bin "$pkgdir"/usr/share \
+		"$subpkgdir"/usr
+	default_dev
+}
+
+_libs() {
+	local name=${subpkgname#$pkgname-libs-}
+	pkgdesc="$pkgdesc ($name library)"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/*-$name.so.* "$subpkgdir"/usr/lib
+}
+
+sha512sums="bd38b2b8963d4d98d42c270e5d7dbff6323789a173b19b67a18258424fd8adee5021b282c9d7f6dad0bd25aa0160e76aecd8ed803d4eb25d911ef0a81cd713a5  wayland-1.14.0.tar.xz"

@@ -1,0 +1,56 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libjpeg-turbo
+pkgver=1.5.2
+pkgrel=0
+pkgdesc="accelerated baseline JPEG compression and decompression library"
+url="http://libjpeg-turbo.virtualgl.org/"
+arch="all"
+license="GPL"
+depends=""
+depends_dev=""
+makedepends="$depends_dev nasm"
+replaces="libjpeg"
+subpackages="$pkgname-doc $pkgname-dev $pkgname-utils"
+source="http://downloads.sourceforge.net/libjpeg-turbo/libjpeg-turbo-$pkgver.tar.gz"
+
+builddir="$srcdir"/libjpeg-turbo-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--with-jpeg8
+	make
+}
+
+package() {
+	cd "$builddir"
+	make -j1 DESTDIR="$pkgdir" docdir=/usr/share/doc/$pkgname \
+		install
+}
+
+utils() {
+	pkgdesc="Utilities for manipulating JPEG images"
+	replaces="jpeg"
+	mkdir -p "$subpkgdir"/usr
+	mv "$pkgdir"/usr/bin "$subpkgdir"/usr/
+}
+
+doc() {
+	default_doc
+	replaces="jpeg-doc"
+}
+
+dev() {
+	default_dev
+	replaces="jpeg-dev"
+}
+
+sha512sums="c7fe5cc77e38fad33af3f10e6db961c8edf033a86c09541121f49bfa20547179760924e6d3e397f0add7030459ff3babadd3457ab2da4a40a2147dc1574aa444  libjpeg-turbo-1.5.2.tar.gz"

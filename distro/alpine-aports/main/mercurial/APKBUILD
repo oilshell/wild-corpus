@@ -1,0 +1,65 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=mercurial
+pkgver=4.3.3
+pkgrel=0
+pkgdesc="A scalable distributed SCM tool"
+url="https://www.mercurial-scm.org/"
+arch="all"
+license="GPL2+"
+depends=""
+makedepends="python2-dev"
+subpackages="
+	$pkgname-doc
+	$pkgname-vim:vim:noarch
+	$pkgname-zsh-completion:zshcomp:noarch
+	$pkgname-bash-completion:bashcomp:noarch"
+source="https://www.mercurial-scm.org/release/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+}
+
+package() {
+	cd "$builddir"
+	python2 setup.py install --root="$pkgdir"
+	install -m755 contrib/hgk hgeditor "$pkgdir"/usr/bin
+
+	for man in doc/*.?; do
+		install -Dm644 "$man" \
+			"$pkgdir"/usr/share/man/man${man##*.}/${man##*/}
+	done
+}
+
+vim() {
+	depends=""
+	pkgdesc="Vim syntax for $pkgname"
+	install_if="vim $pkgname=$pkgver-r$pkgrel"
+
+	cd "$builddir"/contrib/vim/
+	mkdir -p "$subpkgdir"/usr/share/vim/vimfiles/syntax/
+	install -Dm644 HGAnnotate.vim hgtest.vim \
+		"$subpkgdir"/usr/share/vim/vimfiles/syntax/
+}
+
+zshcomp() {
+	depends=""
+	pkgdesc="Zsh completions for $pkgname"
+	install_if="$pkgname=$pkgver-r$pkgrel zsh"
+
+	install -Dm644 "$builddir"/contrib/zsh_completion \
+		"$subpkgdir"/usr/share/zsh/site-functions/_${pkgname}
+}
+
+bashcomp() {
+	depends=""
+	pkgdesc="Bash completions for $pkgname"
+	install_if="$pkgname=$pkgver-r$pkgrel bash-completion"
+
+	install -Dm644 "$builddir"/contrib/bash_completion \
+		"$subpkgdir"/usr/share/bash-completion/completions/${pkgname}
+}
+
+sha512sums="2d5249b6b2ec6b21c548702af2cf6b8e0858197a370514465aa7a880391f2e9efd6aecefb67fc547dfb8759c1c678009dc5a33fc48743bee30fcbdd853ee1cc6  mercurial-4.3.3.tar.gz"

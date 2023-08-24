@@ -1,0 +1,40 @@
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=guvcview
+pkgver=2.0.5
+pkgrel=0
+pkgdesc="Webcam viewer"
+url="http://guvcview.sourceforge.net/"
+arch="all"
+license="GPLv3"
+depends=
+depends_dev=
+makedepends="gtk+3.0-dev eudev-dev sdl-dev portaudio-dev ffmpeg-dev gsl-dev
+	v4l-utils-dev libusb-dev linux-headers"
+install=
+subpackages="$pkgname-doc $pkgname-lang"
+source="http://downloads.sourceforge.net/project/guvcview/source/guvcview-src-$pkgver.tar.gz
+	0001-fix-building-with-musl-libc.patch
+	"
+
+builddir="$srcdir"/guvcview-src-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure --prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--disable-sdl2 \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+sha512sums="b4a1216ab2effbd0022d5ba0ce266ac06a781e453d3dbedfe29b654864d3a26fe1e8b68245d76eff854281d42f1871a8a82b06f783b5115e94ec1c111aac05eb  guvcview-src-2.0.5.tar.gz
+9ab9575bc41acc79581da8d43ef52fc9cf2bf46ef7df97951202e47f5516c38b42ebb715a4e8d6010ac9875c2c9c8cb1912d39282d4a632123424ab516632c98  0001-fix-building-with-musl-libc.patch"

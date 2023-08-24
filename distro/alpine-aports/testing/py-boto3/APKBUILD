@@ -1,0 +1,55 @@
+# Maintainer: Valery Kartel <valery.kartel@gmail.com>
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+pkgname=py-boto3
+_pkgname=boto3
+pkgver=1.4.7
+pkgrel=0
+pkgdesc="AWS SDK for Python (Boto3)"
+url="http://aws.amazon.com/sdk-for-python/"
+arch="noarch"
+license="ASL 2.0"
+depends="py-botocore"
+makedepends="python2-dev py-setuptools python3-dev"
+subpackages="py3-$_pkgname:_py3 py2-$_pkgname:_py2"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir"/$_pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+	python3 setup.py build
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	depends="${depends//py-/py2-}"
+	_py python2
+}
+
+_py3() {
+	depends="${depends//py-/py3-}"
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+tools() {
+	pkgdesc="Command line tools to deal with Amazon Web Services"
+	depends="$pkgname"
+	mkdir -p "$subpkgdir"/usr
+	mv "$pkgdir"/usr/bin "$subpkgdir"/usr
+}
+
+sha512sums="3edb3c5719c74b6d11b62b4c37489a8872a77898f4b6d1d2ff81cfa8e190e7d325359737c2c621683e0097ad4d811028422a46d57fbaa2d37e5781aa455e1075  boto3-1.4.7.tar.gz"

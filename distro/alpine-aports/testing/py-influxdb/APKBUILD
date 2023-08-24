@@ -1,0 +1,46 @@
+# Contributor: Olivier Mauras <olivier@mauras.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-influxdb
+_pkgname=influxdb-python
+pkgver=4.1.1
+pkgrel=0
+pkgdesc="Python bindings for InfluxDB"
+url="https://github.com/influxdata/influxdb-python"
+arch="all"
+license="MIT"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+depends=""
+makedepends="python2-dev python3-dev py-setuptools libressl-dev"
+source="$pkgname-$pkgver.tar.gz::https://github.com/influxdata/${_pkgname}/archive/v${pkgver}.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+_py() {
+	local python=$1
+	pkgdesc="$pkgdesc - $python"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir" || return 1
+}
+
+sha512sums="15b8f508acdffcd9ef4e2cdbfd3ebf58edcfd70c70655c8d7b7bdbbd3a698f1518759638d1475f219c29a72485c3a89206a829602dd0098820d3594971864320  py-influxdb-4.1.1.tar.gz"

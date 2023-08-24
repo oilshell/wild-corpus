@@ -1,0 +1,42 @@
+# Maintainer: Carlo Landmeter <clandmeter@gmail.com>
+pkgname=zip
+pkgver=3.0
+pkgrel=4
+pkgdesc="Creates PKZIP-compatible .zip files"
+url="http://www.info-zip.org/pub/infozip/Zip.html"
+arch="all"
+license="Custom"
+depends=""
+makedepends=""
+subpackages="$pkgname-doc"
+source="ftp://ftp.info-${pkgname}.org/pub/info${pkgname}/src/${pkgname}30.zip
+		10-zip-3.0-build.patch
+		20-zip-3.0-exec-stack.patch
+		30-zip-3.0-pic.patch"
+
+_builddir="$srcdir"/${pkgname}30
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p0 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build () {
+	cd "$_builddir"
+	make -f unix/Makefile LOCAL_ZIP="${CFLAGS} ${CPPFLAGS}" prefix=/usr generic || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make -f unix/Makefile prefix=${pkgdir}/usr MANDIR=${pkgdir}/usr/share/man install || return 1
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="642ea6768d79adc1499251a3fb7bfc7ddc8d708699cbf9e0cfe849deda94165cb93e21dc2606bea1166ae5d8531e1e2cb056a7246bf2ab86ea7587bd4712d8d8  zip30.zip
+43b748461a1f015c8a90d7bac0466b274f3cd722ebba208f01849ada670300cfdc8f10f0a4771658750f78fe25459591537c9cac1d3539e0156ee61dac28ac06  10-zip-3.0-build.patch
+84392facb6bf7aeaef0423591ad7005528afb471348c7f46ba18390cf9a08156bb711dadee238ffceb30228d70059c1bdad60def21bcc9b6ba4ffacfb22ceb65  20-zip-3.0-exec-stack.patch
+c6086bcf598c171586e32bf98adf14f6adbb4aa63fa8c26202de8a249ab8ec4edd72acb89aa725001c5f111e1b41c8871ee0ee7e828cd29401cb882ce794ec23  30-zip-3.0-pic.patch"

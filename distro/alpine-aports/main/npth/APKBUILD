@@ -1,0 +1,37 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=npth
+pkgver=1.5
+pkgrel=1
+pkgdesc="The New GNU Portable Threads library"
+url="ftp://ftp.gnupg.org/gcrypt/npth/"
+arch="all"
+license="LGPLv3+ or GPLv2+ or (LGPLv3+ and GPLv2+)"
+subpackages="$pkgname-dev"
+source="ftp://ftp.gnupg.org/gcrypt/npth/npth-$pkgver.tar.bz2"
+
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="20f0ec59d304c68081e42535870af8e76c18e30aa7b04ccdafe60fe5261ad7275c2c0e3ea3a767d6145258a3a39fa641032cd97205318266dd727a5fe7ee331a  npth-1.5.tar.bz2"

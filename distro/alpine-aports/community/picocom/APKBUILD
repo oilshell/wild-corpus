@@ -1,0 +1,37 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Sören Tempel <soeren+alpine@soeren-tempel.net>
+pkgname=picocom
+pkgver=2.2
+pkgrel=0
+pkgdesc="Minimal dumb-terminal emulation program"
+url="https://github.com/npat-efault/picocom"
+arch="all"
+license="GPL2"
+depends=""
+makedepends=""
+install=""
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/npat-efault/${pkgname}/archive/${pkgver}.tar.gz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	make CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
+		-C "$builddir" || return 1
+}
+
+package() {
+	install -Dm755 "$builddir"/$pkgname \
+		"$pkgdir"/usr/bin/$pkgname || return 1
+	install -Dm644 "$builddir"/$pkgname.1 \
+		"$pkgdir"/usr/share/man/man1/$pkgname.1 || return 1
+
+	local file=
+	for file in CONTRIBUTORS README.md TODO; do
+		install -Dm644 "$builddir"/$file \
+			"$pkgdir"/usr/share/doc/$pkgname/$file || return 1
+	done
+}
+
+md5sums="65da5cd32f8cfa456bbe79bbcc908daf  picocom-2.2.tar.gz"
+sha256sums="3e3904158d675541f0fcfdcd1f671b38445338f536080f5de8d6674b5f33d4ce  picocom-2.2.tar.gz"
+sha512sums="21495af30b81dfd1b3f4fea1ecf93c3a9252be1ae2ba94c7a2a07ceb75f562bc2ebc6ef6a8ae61f810ff5c121d4ab572a6f8ba75283e2cb28cf9886f834df0fa  picocom-2.2.tar.gz"

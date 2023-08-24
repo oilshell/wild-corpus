@@ -1,0 +1,45 @@
+# Contributor: Francesco Colista <fcolista@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=podofo
+pkgver=0.9.5
+pkgrel=1
+pkgdesc="A C++ library to work with the PDF file format"
+url="http://podofo.sourceforge.net"
+arch="all"
+license="GPL"
+depends=
+makedepends="tiff-dev libpng-dev fontconfig-dev
+cmake lua-dev libressl-dev libidn-dev"
+install=""
+subpackages="$pkgname-dev $pkgname-doc"
+source="http://downloads.sourceforge.net/${pkgname}/${pkgname}-${pkgver}.tar.gz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+# secfixes:
+#   0.9.5-r0:
+#     - CVE-2017-6843
+#     - CVE-2017-6844
+#     - CVE-2017-6845
+#     - CVE-2017-6846
+#     - CVE-2017-6847
+#     - CVE-2017-6849
+
+build() {
+	cd "$builddir"
+	mkdir build
+	cd build
+	cmake -DCMAKE_INSTALL_PREFIX=/usr .. \
+		-DPODOFO_BUILD_SHARED=1 \
+		-DPODOFO_HAVE_JPEG_LIB=1 \
+		-DPODOFO_HAVE_PNG_LIB=1 \
+		-DPODOFO_HAVE_TIFF_LIB=1
+	make || return 1
+}
+package() {
+	cd "$builddir"/build
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+md5sums="4751a6cf41250bea550a73ff960b7228  podofo-0.9.5.tar.gz"
+sha256sums="854981cb897ebc14bac854ea0f25305372261a48a205363fe1c61659ba7b5304  podofo-0.9.5.tar.gz"
+sha512sums="d13b30bfebc89b809173cd2251eed1f15dfa90abb58371bfdce875797d40663923571824ad2b0b1d97aa1be212bdbb710c3a0439bc05bed7022b8eb75ca74705  podofo-0.9.5.tar.gz"

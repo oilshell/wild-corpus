@@ -1,0 +1,44 @@
+# Contributor: Leonardo Arena <rnalrd@alpinelinux.org>
+# Maintainer: Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=nextcloud-client
+_realname=client_theming
+pkgver=2.3.2
+pkgrel=0
+pkgdesc="Nextcloud Desktop Client"
+url="https://github.com/nextcloud/client_theming"
+arch="all"
+license="GPL2"
+depends=
+depends_dev=
+makedepends="$depends_dev cmake qt5-qttools-dev qt5-qtwebkit-dev
+	qt5-qtkeychain-dev"
+install=
+subpackages="$pkgname-dev"
+source="owncloud-client-$pkgver.tar.gz::https://github.com/owncloud/client/archive/v$pkgver.tar.gz
+	$pkgname-$pkgver.tar.gz::https://github.com/nextcloud/$_realname/archive/v$pkgver.tar.gz"
+
+builddir="$srcdir"/client-$pkgver
+
+build() {
+	cd "$builddir"
+	# mkdir _build.tmp && cd _build.tmp
+	cmake \
+		-DCMAKE_BUILD_TYPE="Release" \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_SYSCONFDIR=/etc/$pkgname \
+		-DOEM_THEME_DIR="$srcdir/$_realname-$pkgver/nextcloudtheme"
+	make all || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+
+	# remove the 2 lines below (and this) if there is no init.d script
+	# install -m755 -D "$srcdir"/$pkgname.initd "$pkgdir"/etc/init.d/$pkgname
+	# install -m644 -D "$srcdir"/$pkgname.confd "$pkgdir"/etc/conf.d/$pkgname
+}
+
+sha512sums="a639eb306c81a3a78533b46b72a1cfe6b0b33a1ae8b492069edfde75fd2380b66a134e8c2eae53369fabe8a288115f362488652be60dbb814b5bb5bbbdffa17d  owncloud-client-2.3.2.tar.gz
+0447a3e5ee3338cb98b9d503a94d32c926f9092a25fee11e3686e5d662362137dce09865350cdc3c9af62ac8a6ebfa7fcd00f817edbb10189512a6df8e587628  nextcloud-client-2.3.2.tar.gz"

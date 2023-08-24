@@ -1,0 +1,37 @@
+# Contributor:
+# Maintainer:
+pkgname=cfssl
+pkgver=1.2.0
+pkgrel=0
+pkgdesc="Cloudflare PKI and TLS toolkit"
+url="https://cfssl.org"
+arch="all"
+license="BSD"
+makedepends="go"
+source="$pkgname-$pkgver.tar.gz::https://github.com/cloudflare/$pkgname/archive/$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+  cd "$srcdir"
+  export GOPATH="$PWD"
+  export GO15VENDOREXPERIMENT=1
+
+  mkdir -p src/github.com/cloudflare/
+  cp -r "$builddir" src/github.com/cloudflare/cfssl
+
+  go install -tags pkcs11 github.com/cloudflare/cfssl/cmd/...
+}
+
+package() {
+  cd "$srcdir"
+  install -Dm755 bin/cfssl $pkgdir/usr/bin/cfssl
+  install -Dm755 bin/cfssl-bundle $pkgdir/usr/bin/cfssl-bundle
+  install -Dm755 bin/cfssl-certinfo $pkgdir/usr/bin/cfssl-certinfo
+  install -Dm755 bin/cfssl-newkey $pkgdir/usr/bin/cfssl-newkey
+  install -Dm755 bin/cfssl-scan $pkgdir/usr/bin/cfssl-scan
+  install -Dm755 bin/cfssljson $pkgdir/usr/bin/cfssljson
+  install -Dm755 bin/mkbundle $pkgdir/usr/bin/mkbundle
+  install -Dm755 bin/multirootca $pkgdir/usr/bin/multirootca
+}
+
+sha512sums="7ecf2d6e6248b94f1abbb714c1fa3eb257903a4adab2a2c6708f63f286a82030451a2c93ba082653a0b97b1881070052beec5e0858b14d6971ecec87fd0e432f  cfssl-1.2.0.tar.gz"

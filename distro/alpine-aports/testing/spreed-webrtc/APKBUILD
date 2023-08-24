@@ -1,0 +1,56 @@
+# Contributor: Leonardo Arena <rnalrd@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=spreed-webrtc
+pkgver=0.29.6
+pkgrel=0
+pkgdesc="WebRTC audio/video call and conferencing server"
+url="http://spreed.me"
+arch="all"
+license="AGPL3"
+depends=
+depends_dev=
+makedepends="$depends_dev autoconf automake go go-context go-acceptlanguageparser
+	go-conf go-httputils go-mux go-nats go-nuid go-pkac go-phoenix
+	go-securecookie go-sloth go-spreed-turnservicecli go-uuid go-websocket
+	nodejs"
+install="$pkgname.pre-install"
+subpackages="$pkgname-doc"
+pkgusers="spreed"
+pkggroups="spreed"
+_vendor="strukturag"
+source="$pkgname-$pkgver.tar.gz::https://github.com/$_vendor/spreed-webrtc/archive/v$pkgver.tar.gz
+	$pkgname.initd"
+builddir="$srcdir"/$pkgname-$pkgver
+
+prepare() {
+	cd "$builddir"
+	./autogen.sh
+	#some libraries aren't in the expected path in the tarball
+	mkdir -p src/github.com/$_vendor/$pkgname && mv go src/github.com/$_vendor/$pkgname || return 1
+	#fix default server config
+	sed -i 's|;root = /usr/share/spreed-webrtc-server/www|root = /usr/share/spreed-webrtc-server/www|' \
+		server.conf.in || return 1
+}
+
+build() {
+	cd "$builddir"
+	./configure --prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info
+	make GOPATH="$GOPATH $builddir/go:$builddir/src" assets || return 1
+	make GOPATH="$GOPATH $builddir:$builddir/go:$builddir/src" binaryall || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	mkdir -p "$pkgdir"/usr/share/doc/$pkgname
+	mv doc/* "$pkgdir"/usr/share/doc/$pkgname
+	install -m644 -D server.conf.in "$pkgdir"/etc/$pkgname/${pkgname}-server.conf
+	install -m755 -D "$srcdir"/$pkgname.initd "$pkgdir"/etc/init.d/${pkgname}-server
+	mkdir -p "$pkgdir"/var/log/$pkgname && chown spreed:spreed "$pkgdir"/var/log/$pkgname
+}
+
+sha512sums="861f541ea471667e0215ddbdf1297e4fca0d73ebde7a74e110f7186253b992b8de5201d67083b8b76f5e58c6adb38f355ec10a0ba0e1058713efea0cf967b6b3  spreed-webrtc-0.29.6.tar.gz
+740290f2803fd5b960630c74c34efd36f85381d1422d2dac5704346a74cd2395b5bab931c8bcbf5d7db5ead188618020a937933c609fe2db6b184bd5f7e20419  spreed-webrtc.initd"

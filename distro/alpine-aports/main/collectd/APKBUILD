@@ -1,0 +1,129 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=collectd
+pkgver=5.7.2
+pkgrel=0
+pkgdesc="The system statistics collection daemon"
+url="http://collectd.org"
+arch="all"
+license="GPL2"
+depends=""
+makedepends="curl-dev net-snmp-dev postgresql-dev perl-dev python2-dev
+	libgcrypt-dev mariadb-dev zlib-dev libressl-dev iptables-dev
+	rrdtool-dev yajl-dev libvirt-dev lm_sensors-dev libxml2-dev
+	hiredis-dev eudev-dev mosquitto-dev lua-dev lvm2-dev openipmi-dev
+	libpcap-dev liboping-dev
+	autoconf automake libtool"
+install=""
+subpackages="$pkgname-dev $pkgname-doc $pkgname-libs
+	$pkgname-perl $pkgname-snmp $pkgname-curl:_curl $pkgname-utils
+	$pkgname-write_http $pkgname-nginx $pkgname-apache $pkgname-postgresql
+	$pkgname-network $pkgname-mysql $pkgname-rrdtool $pkgname-sensors
+	$pkgname-python:_python $pkgname-iptables:_ipt $pkgname-bind
+	$pkgname-ascent $pkgname-virt $pkgname-redis $pkgname-write_redis
+	$pkgname-log_logstash $pkgname-ceph $pkgname-disk $pkgname-lvm
+	$pkgname-lua $pkgname-mqtt $pkgname-ipmi $pkgname-ping $pkgname-dns"
+install="$pkgname.pre-install"
+pkgusers="collectd"
+pkggroups="collectd"
+source="http://collectd.org/files/collectd-$pkgver.tar.bz2
+	collectd.initd
+	gnu_source.patch
+	collectd.pre-install"
+
+builddir="$srcdir"/$pkgname-$pkgver
+
+# security fixes:
+#   5.5.2-r0:
+#   -  CVE-2016-6254
+
+build() {
+	cd "$builddir"
+	autoreconf -vif || return 1
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc/collectd \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstate=/var \
+		--with-libiptc \
+		--enable-rrdtool \
+		--enable-libvirt \
+		--enable-bind \
+		--disable-werror \
+		--with-perl-bindings=INSTALLDIRS=vendor \
+		|| return 1
+	make || return 1
+	# disable plugins by default since its in a subpackage
+	sed -i -e 's/^LoadPlugin network/#LoadPlugin network/' \
+		src/collectd.conf || return 1
+	sed -i -e 's/^LoadPlugin rrdtool/#LoadPlugin rrdtool/' \
+		src/collectd.conf || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	chown root:collectd "$pkgdir"/etc/collectd/collectd.conf || return 1
+	find "$pkgdir" \( -name perllocal.pod -o -name .packlist \) -delete
+	install -m755 -D "$srcdir"/$pkgname.initd "$pkgdir"/etc/init.d/$pkgname
+}
+
+perl() {
+	pkgdesc="perl bindings to collectd"
+	mkdir -p "$subpkgdir"/usr/lib/collectd \
+		"$subpkgdir"/usr/share || return 1
+	mv "$pkgdir"/usr/lib/collectd/perl.so \
+		"$subpkgdir"/usr/lib/collectd/ || return 1
+	mv "$pkgdir"/usr/lib/perl* "$subpkgdir"/usr/lib/ || return 1
+	mv "$pkgdir"/usr/share/perl* "$subpkgdir"/usr/share/
+}
+
+utils() {
+	pkgdesc="$pkgname utilities"
+	mkdir -p "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/bin/* "$subpkgdir"/usr/bin/
+}
+
+_plugin() {
+	local mod=$1
+	local desc=${2:-$mod}
+	pkgdesc="$desc pluin for collectd"
+	depends="collectd"
+	install -d "$subpkgdir"/usr/lib/collectd
+	mv "$pkgdir"/usr/lib/collectd/$mod.so "$subpkgdir"/usr/lib/collectd/
+}
+
+snmp()		{ _plugin snmp; }
+_curl()		{ _plugin 'curl*'; }
+write_http()	{ _plugin write_http; }
+nginx()		{ _plugin nginx; }
+apache()	{ _plugin apache; }
+postgresql()	{ _plugin postgresql; }
+mysql()		{ _plugin mysql; }
+network()	{ _plugin network; }
+rrdtool()	{ _plugin 'rrd*'; }
+sensors()	{ _plugin sensors; }
+_python()	{ _plugin python; }
+_ipt()		{ _plugin iptables; }
+bind()		{ _plugin bind; }
+ascent()	{ _plugin ascent; }
+redis()		{ _plugin redis; }
+write_redis()	{ _plugin write_redis; }
+log_logstash()	{ _plugin log_logstash; }
+ceph()		{ _plugin ceph; }
+disk()		{ _plugin disk; }
+lvm()		{ _plugin lvm; }
+lua()		{ _plugin lua; }
+mqtt()		{ _plugin mqtt; }
+virt()		{ _plugin virt; provides="$pkgname-libvirt"; }
+ipmi()		{ _plugin ipmi; }
+ping()		{ _plugin ping; }
+dns()		{ _plugin dns; }
+
+sha512sums="8844b67159f8da2203b5ac57ef19fce0a01050a016174d196b48b5fb24925ad2935af9bdd9af06097ff663499abc496cdcc2d9e9a10f403f8d707c465c1a88f3  collectd-5.7.2.tar.bz2
+a286c2164af196154d017658d6e5aa3cc4f76dadf90b68c3021418979d9f0377776bb990d737ae5c916c04475725365aea8b78e3bc5e2f3679d5a99f8b9af13e  collectd.initd
+519fa563d319928e35e0235dd2bc38e7e53dbaae93ede1c93622dab2d00e1ac3baa93200f9e3e62cb81c1c9d808171b4648db864191d57a703ac7874b9c5fb95  gnu_source.patch
+cb0efcd3b9bd5620b7d812d5f038ebd60253f1ce9006da0a1b4b56666202a4254e80ab6a84d675b6cb099ecda1897de17b51a9e3f0d83e8b0455343f5f6d24d7  collectd.pre-install"

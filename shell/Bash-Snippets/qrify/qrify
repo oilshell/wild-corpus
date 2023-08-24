@@ -1,0 +1,144 @@
+#!/bin/bash
+# Author: Linyos Torovoltos github.com/linyostorovovoltos
+
+currentVersion="1.11.1"
+multiline="0" # flag that indicates multiline option
+
+
+getConfiguredClient()
+{
+  if command -v curl &> /dev/null ; then
+    configuredClient="curl"
+  elif command -v wget &> /dev/null ; then
+    configuredClient="wget"
+  else
+    echo "Error: This tool requires either curl or  wget to be installed." >&2
+    return 1
+  fi
+}
+
+update()
+{
+  # Author: Alexander Epstein https://github.com/alexanderepstein
+  # Update utility version 1.2.0
+  # To test the tool enter in the defualt values that are in the examples for each variable
+  repositoryName="Bash-Snippets" #Name of repostiory to be updated ex. Sandman-Lite
+  githubUserName="alexanderepstein" #username that hosts the repostiory ex. alexanderepstein
+  nameOfInstallFile="install.sh" # change this if the installer file has a different name be sure to include file extension if there is one
+  latestVersion=$(httpGet https://api.github.com/repos/$githubUserName/$repositoryName/tags | grep -Eo '"name":.*?[^\\]",'| head -1 | grep -Eo "[0-9.]+" ) #always grabs the tag without the v option
+
+  if [[ $currentVersion == "" || $repositoryName == "" || $githubUserName == "" || $nameOfInstallFile == "" ]];then
+    echo "Error: update utility has not been configured correctly." >&2
+    exit 1
+  elif [[ $latestVersion == "" ]];then
+    echo "Error: no active internet connection" >&2
+    exit 1
+  else
+    if [[ "$latestVersion" != "$currentVersion" ]]; then
+      echo "Version $latestVersion available"
+      echo -n "Do you wish to update $repositoryName [Y/n]: "
+      read -r answer
+      if [[ "$answer" == "Y" || "$answer" == "y" ]] ;then
+        cd  ~ || { echo 'Update Failed' ; exit 1 ; }
+        if [[ -d  ~/$repositoryName ]]; then rm -r -f $repositoryName  ||  { echo "Permissions Error: try running the update as sudo"; exit 1; } ; fi
+        git clone "https://github.com/$githubUserName/$repositoryName" || { echo "Couldn't download latest version" ; exit 1; }
+        cd $repositoryName ||  { echo 'Update Failed' ; exit 1 ;}
+        git checkout "v$latestVersion" 2> /dev/null || git checkout "$latestVersion" 2> /dev/null || echo "Couldn't git checkout to stable release, updating to latest commit."
+        chmod a+x install.sh #this might be necessary in your case but wasnt in mine.
+        ./$nameOfInstallFile "update" || exit 1
+        cd ..
+        rm -r -f $repositoryName ||  { echo "Permissions Error: update succesfull but cannot delete temp files located at ~/$repositoryName delete this directory with sudo"; exit 1; }
+      else
+        exit 1
+      fi
+    else
+      echo "$repositoryName is already the latest version"
+    fi
+  fi
+
+}
+
+httpGet()
+{
+  case "$configuredClient" in
+    curl) curl -A curl -s "$@";;
+    wget) wget -qO- "$@";;
+  esac
+}
+
+makeqr()
+{
+  input=$(echo $input | sed s/" "/%20/g ) ## replace all spaces in the sentence with HTML encoded space %20
+  httpGet qrenco.de/$input ## get a response for the qrcode
+}
+
+makeMultiLineQr()
+{
+  if [[ $configuredClient != "curl" ]]; then ## prevent usage without curl it is unreliable
+    echo "Multiline currently only supports curl!"
+    return 1
+  else
+    printf "%s" "$*"  | curl -F-=\<- qrenco.de
+  fi
+}
+
+checkInternet()
+{
+  echo -e "GET http://google.com HTTP/1.0\n\n" | nc google.com 80 > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    return 0
+  else
+    echo "Error: no active internet connect" >&2
+    return 1
+  fi
+}
+
+usage()
+{
+  echo "Qrify"
+  echo "Usage: qrify [stringtoturnintoqrcode]"
+  echo "Description: Converts strings or urls into a qr code."
+  echo "    -u Update Bash-Snippet Tools"
+	echo "    -m Enable multiline support (feature not working yet)"
+  echo "    -h Show the help"
+  echo "    -v Get the tool version"
+  echo "Examples:"
+  echo "    qrify this is a test string"
+  echo "    qrify -m two\\\\nlines"
+  echo "    qrify github.com # notice no http:// or https:// this will fail"
+
+}
+
+getConfiguredClient || exit 1
+checkInternet || exit 1
+
+while getopts m:hvu*: option
+do
+  case "${option}" in
+    v) echo "Version $currentVersion" && exit 0 ;;
+    u) update && exit 0 || exit 1 ;;
+    h) usage && exit 0 ;;
+		m) multiline="1" && echo "Error this is not a supported feature yet" && exit 1 ;;
+    *) usage && exit 0 ;;
+  esac
+done
+
+if [[ $# == "0" ]]; then
+  usage
+  exit 0
+elif [[ $1 == "help" ]]; then
+  usage
+  exit 0
+elif [[ $1 == "update" ]];then
+  update || exit 1
+  exit 0
+else
+  if [[ $multiline == "0" ]];then
+    input=$(printf '%s ' "$@")
+    makeqr || exit 1
+    exit 0
+  else
+    makeMultiLineQr "${@:2}" || exit 1 ## if multiline that means a flag existed so start from the second argument
+    exit 0
+  fi
+fi

@@ -1,0 +1,15 @@
+#!/bin/bash
+Setup.provide C 0.1
+
+: ${C_PREFIX="/$SETUP_PREFIX"}
+: ${C_BUILD="${C_PREFIX}.build"}
+: ${C_SRC="${C_PREFIX}src"}
+: ${C_DEP="${C_BUILD}/dep"}
+: ${C_OBJ="${C_BUILD}/obj"}
+: ${C_BIN="${C_BUILD}/bin"}
+
+function C.compile() { gcc -c "$2" ${C_SRC:+-I"$C_SRC"} -o "$1"; }
+function C.ld() { gcc -o "$1" "${@:2}"; }
+function C.includes() { sed 's,#include "(.*)",'"${C_SRC:+$C_SRC/}"'\1,p' -rn "$2" > "$1"; }
+
+prepare-match "$"

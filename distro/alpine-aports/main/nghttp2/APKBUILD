@@ -1,0 +1,45 @@
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=nghttp2
+pkgver=1.26.0
+pkgrel=0
+pkgdesc="Experimental HTTP/2 client, server and proxy"
+url="https://nghttp2.org/"
+arch="all"
+license="MIT"
+makedepends="libev-dev libressl-dev zlib-dev c-ares-dev"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-libs"
+source="https://github.com/tatsuhiro-t/$pkgname/releases/download/v$pkgver/nghttp2-$pkgver.tar.xz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--disable-static \
+		--without-libxml2 \
+		--without-spdylay \
+		--without-neverbleed \
+		--without-jemalloc \
+		--disable-python-bindings \
+		--enable-app
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="d469f2a50192edbb2528896c1eee85c23a32bbd39b1769e1b78b9d4b05f14f51eb46162d305c81fe50de85251ff38f2a5bb83cde3d5f8c7e1a534ff855b5444d  nghttp2-1.26.0.tar.xz"

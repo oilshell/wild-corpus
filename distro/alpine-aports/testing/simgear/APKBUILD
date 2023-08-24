@@ -1,0 +1,44 @@
+# Maintainer: Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=simgear
+pkgver=2017.1.3
+pkgrel=1
+pkgdesc="Sim library for FlightGear"
+url="https://github.com/FlightGear/simgear"
+arch="all"
+license="GPL"
+depends=
+depends_dev=
+makedepends="$depends_dev boost-dev cmake curl-dev mesa-dev openal-soft-dev
+	openscenegraph-dev zlib-dev"
+install=
+subpackages=
+source="$pkgname-$pkgver.tar.gz::https://github.com/FlightGear/simgear/archive/version/$pkgver.tar.gz
+	musl-fixes.patch
+	"
+
+builddir="$srcdir"/$pkgname-version-$pkgver
+
+prepare() {
+	cd "$builddir"
+	default_prepare || return 1
+	mkdir sgbuild && cd sgbuild || return 1
+	cmake .. \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-D_POSIX_C_SOURCE=200112L \
+		|| return 1
+}
+
+build() {
+	cd "$builddir/sgbuild"
+	make || return 1
+}
+
+package() {
+	cd "$builddir/sgbuild"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+sha512sums="a2c98af3c75a1c7276f1c0b2da1747427d8fe4f32e117334b9f925b35297e046c82b6ae4782871b01865a5eded040363309ae4d1b4a8ddfa61b188d07971f0af  simgear-2017.1.3.tar.gz
+7efcf01c9328b0732ae9aa7af4edb52e14919663a8d3acbe429a0697f59a55e85a71628d9afaa3d38327d960dbf5dacc1f964e38dd6cb499b593ae2be918b140  musl-fixes.patch"

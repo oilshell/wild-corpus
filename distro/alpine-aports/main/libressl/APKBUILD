@@ -1,0 +1,71 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Orion <systmkor@gmail.com>
+# Maintainer: Orion <systmkor@gmail.com>
+#
+# secfixes:
+#   2.5.3-r1:
+#     - CVE-2017-8301
+#
+pkgname=libressl
+pkgver=2.5.5
+_namever=${pkgname}${pkgver%.*}
+pkgrel=3
+pkgdesc="Version of the TLS/crypto stack forked from OpenSSL"
+url="http://www.libressl.org/"
+arch="all"
+license="custom"
+depends=""
+makedepends_build=""
+makedepends_host="linux-headers"
+makedepends="$makedepends_host"
+replaces="openssl"
+subpackages="$pkgname-dbg $_namever-libcrypto:_libs $_namever-libssl:_libs
+	$_namever-libtls:_libs $pkgname-dev $pkgname-doc"
+source="http://ftp.openbsd.org/pub/OpenBSD/LibreSSL/$pkgname-$pkgver.tar.gz
+	starttls-ldap.patch
+	"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	CFLAGS="-L$CBUILDROOT/usr/lib $CFLAGS" \
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--with-sysroot=$CBUILDROOT \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	install -Dm644 COPYING "$pkgdir"/usr/share/licenses/$pkgname/COPYING
+}
+
+dev() {
+	default_dev || return 1
+	replaces="openssl-dev"
+}
+
+_libs() {
+	local name="${subpkgname#$_namever-}"
+	pkgdesc="libressl $name library"
+	depends=""
+
+	mkdir -p "$subpkgdir"/lib "$subpkgdir"/usr/lib
+	local f; for f in "$pkgdir"/usr/lib/$name.so.*; do
+		mv $f "$subpkgdir"/lib/
+		ln -s ../../lib/${f##*/} "$subpkgdir"/usr/lib/${f##*/}
+	done
+	if [ "$name" = "libcrypto" ]; then
+		mv "$pkgdir"/etc "$subpkgdir"
+	fi
+}
+
+sha512sums="3f576e74ddea17bd72e1bfbe0b57b94e1a2a9e6fa56cee50624cd8d18f0a8674273086225669e6ece56e6b859d2376e36e2c140d37acb52d4cd79374c4ba7096  libressl-2.5.5.tar.gz
+07e523ae321b4a6a4afbac7acf4bd30e887b8e18ab2801ca42ba48af130b1cb43d56e70d1039b248c6251623b57c1c638db59105e6fbf4e6175be50d67a0473d  starttls-ldap.patch"

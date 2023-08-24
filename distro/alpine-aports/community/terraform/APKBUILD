@@ -1,0 +1,31 @@
+# Contributor: Thomas Boerger <thomas@webhippie.de>
+# Contributor: Gennady Feldman <gena01@gmail.com>
+# Maintainer: Thomas Boerger <thomas@webhippie.de>
+pkgname=terraform
+pkgver=0.10.6
+pkgrel=0
+pkgdesc="Building, changing, and combining infrastructure safely and efficiently"
+url="https://www.terraform.io/"
+arch="all !armhf"
+license="MPL 2.0"
+makedepends="go"
+source="${pkgname}-${pkgver}.tar.gz::https://github.com/hashicorp/terraform/archive/v$pkgver.tar.gz"
+builddir="$srcdir/src/github.com/hashicorp/$pkgname"
+
+prepare() {
+	mkdir -p ${builddir%/*}
+	mv $srcdir/$pkgname-$pkgver "$builddir"/
+	default_prepare
+}
+
+build() {
+	cd "$builddir"
+	export GOPATH="$srcdir"
+	go build -v -o bin/$pkgname
+}
+
+package() {
+	install -Dm755 "$builddir"/bin/$pkgname "$pkgdir"/usr/bin/$pkgname
+}
+
+sha512sums="1c8e016384eb453ce7cd2ce3b1f6d3a4f86675e6da50c46c31418bf3244d835e94928932fe63fc7299e4bafaffbf77688a9b74bb6966497f9399b446ce4dbddf  terraform-0.10.6.tar.gz"

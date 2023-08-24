@@ -1,0 +1,53 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Cág <ca6c@bitmessage.ch>
+pkgname=pcc
+pkgver=20170702
+pkgrel=0
+pkgdesc="The portable C compiler."
+url="http://pcc.ludd.ltu.se/"
+arch="x86 x86_64"
+license="BSD"
+depends="pcc-libs-dev"
+depends_dev=""
+makedepends="byacc flex"
+install=""
+subpackages="$pkgname-doc"
+source="ftp://pcc.ludd.ltu.se/pub/$pkgname/$pkgname-$pkgver.tgz"
+
+builddir="$srcdir/"$pkgname-$pkgver
+prepare() {
+	default_prepare || return 1
+
+	cd "$builddir"
+	update_config_sub || return 1
+
+	sed -i -e 's/AC_CHECK_PROG(strip,strip,yes,no)//' \
+		configure.ac || return 1
+	sed -i -e 's/AC_SUBST(strip)//' \
+		configure.ac || return 1
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		--disable-stripping \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+
+	# Don't conflict with gcc-doc.
+	mv "$pkgdir"/usr/share/man/man1/cpp.1 \
+		"$pkgdir"/usr/share/man/man1/$pkgname-cpp.1 || return 1
+}
+
+sha512sums="5aed9838ae7afa3c0c7614477f76fa50d545531dd4d57f9fa0f1f196cfdd67470b51b3c094781d05461200a26d201ebd92196503eac6d9baa15de71e8c46cfbd  pcc-20170702.tgz"

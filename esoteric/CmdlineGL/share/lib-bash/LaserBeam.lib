@@ -1,0 +1,36 @@
+LaserBeam_InitGfx() {
+	glNewList LaserBeam GL_COMPILE
+
+	# Front
+	glBegin GL_TRIANGLE_FAN
+	glColor 1 0.7 0.7
+	glVertex 0 0 10
+	glColor 1 0.2 0.2
+	glVertex 0 0.2 9
+	glVertex -0.2 0 9
+	glVertex 0 -0.2 9
+	glVertex 0.2 0 9
+	glVertex 0 0.2 9
+	glEnd
+
+	# Tail
+	glBegin GL_TRIANGLE_FAN
+	glColor 0.6 0 0
+	glVertex 0 0 0
+	glColor 1 0.2 0.2
+	glVertex 0 0.2 9
+	glVertex 0.2 0 9
+	glVertex 0 -0.2 9
+	glVertex -0.2 0 9
+	glVertex 0 0.2 9
+	glEnd
+
+	glEndList
+
+	LaserBeam() { glCallList LaserBeam; }
+}
+
+LaserBeam() {
+	LaserBeam_InitGfx
+	glCallList LaserBeam
+}

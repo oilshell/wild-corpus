@@ -1,0 +1,35 @@
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+pkgname=utf8proc
+pkgver=2.1.0
+pkgrel=0
+pkgdesc="A clean C library for processing UTF-8 Unicode data"
+url="https://github.com/JuliaLang/utf8proc"
+arch="all"
+license="MIT custom"
+subpackages="$pkgname-dev"
+source="$pkgname-$pkgver.tar.gz::https://github.com/JuliaLang/$pkgname/archive/v$pkgver.tar.gz
+	$pkgname.pc
+	"
+builddir="$srcdir/$pkgname-$pkgver"
+options="!check"  # testsuite has a dependency on Julia, which depends on this
+
+prepare() {
+	cd "$builddir"
+	sed "s/@VERSION@/$pkgver/" "$srcdir"/$pkgname.pc > $pkgname.pc
+}
+
+build() {
+	cd "$builddir"
+	make
+}
+
+package() {
+	cd "$builddir"
+
+	make DESTDIR="$pkgdir" prefix=/usr install
+	install -D $pkgname.pc "$pkgdir"/usr/lib/pkgconfig/$pkgname.pc
+}
+
+sha512sums="72b7f377fa6a62018d3eeab8723a27e25db3d1f794ae0bf21fff62ec1a7439bec52e7c93d2a00c218de6ff518097fb4a7a87c56e61ba8c98e689aa8f7171c812  utf8proc-2.1.0.tar.gz
+95e6fe681b9bd35414c2e1b1948ab9eb37274cfbd9e7b970bc7685eb7e03155bd08781b48f3084a2c81440a54f12d4130ed19e06fe4fcc0f1e45d99f225636d7  utf8proc.pc"

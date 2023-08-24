@@ -1,0 +1,51 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=xf86-video-intel
+pkgver=2.99.917_git20170325
+pkgrel=0
+pkgdesc="X.Org driver for Intel cards"
+url="http://xorg.freedesktop.org/"
+arch="x86 x86_64"
+license="MIT"
+subpackages="$pkgname-doc"
+depends="mesa-dri-intel"
+makedepends="xorg-server-dev libxi-dev fontsproto randrproto
+	videoproto renderproto glproto xineramaproto libdrm-dev xf86driproto
+	mesa-dev libxvmc-dev xcb-util-dev eudev-dev
+	util-macros autoconf automake libtool"
+
+_ver=${pkgver%_git*}
+source="http://www.x.org/releases/individual/driver/$pkgname-$_ver.tar.bz2
+	git.patch
+	"
+
+builddir="$srcdir"/$pkgname-$_ver
+prepare() {
+	cd "$builddir"
+	default_prepare
+	autoreconf -vif
+}
+
+build() {
+	cd "$builddir"
+	export LDFLAGS="$LDFLAGS -Wl,-z,lazy"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--enable-xvmc \
+		--disable-selective-werror \
+		--with-default-dri=3 \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	install -Dm644 COPYING "$pkgdir"/usr/share/licenses/$pkgname/COPYING
+
+	# http://bugs.alpinelinux.org/issues/3312
+	chmod o-x "$pkgdir"/usr/libexec/xf86-video-intel-backlight-helper
+}
+sha512sums="cbf4d46ad1ad5e5587c0f1f620ff534ef0645270517b60056b9f03e83d8216e2f456de46352a06c37c0c46963cc4ed20b71b815b20ec1bf680ff046e535f580f  xf86-video-intel-2.99.917.tar.bz2
+0fe4e455dcbc4ae6622dca483ef3ddc765c43009fdb0fef82bdaa835a737796a6caf8afa9c6630919f43c977a6f736770c3779f04d8c823da4fc9cee17d16f19  git.patch"

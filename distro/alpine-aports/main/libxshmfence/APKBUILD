@@ -1,0 +1,40 @@
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer:
+pkgname=libxshmfence
+pkgver=1.2
+pkgrel=2
+pkgdesc="X11 shared memory fences"
+url="http://www.x.org/"
+arch="all"
+license="MIT"
+depends=""
+depends_dev="linux-headers"
+makedepends="$depends_dev util-macros xproto"
+install=""
+subpackages="$pkgname-dev"
+source="http://www.x.org/releases/individual/lib/libxshmfence-$pkgver.tar.bz2"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--disable-static \
+		--enable-futex
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+md5sums="66662e76899112c0f99e22f2fc775a7e  libxshmfence-1.2.tar.bz2"
+sha256sums="d21b2d1fd78c1efbe1f2c16dae1cb23f8fd231dcf891465b8debe636a9054b0c  libxshmfence-1.2.tar.bz2"
+sha512sums="340a6dff5c7ce7f0fe89d8094ee91a0572c8bf0da888861c5262d6a65a13ecad0e2a079949ccc115e15a2d0d108c4f1ba1743874289cacbbc17aa3a05cd8e072  libxshmfence-1.2.tar.bz2"

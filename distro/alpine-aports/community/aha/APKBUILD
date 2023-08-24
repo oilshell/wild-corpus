@@ -1,0 +1,31 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=aha
+pkgver=0.4.10.6
+pkgrel=0
+pkgdesc="ANSI color to HTML converter"
+url="http://anonscm.debian.org/gitweb/?p=collab-maint/aha.git;a=summary"
+arch="all"
+license="MPL 1.1"
+depends=""
+depends_dev=""
+makedepends=""
+install=""
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/theZiz/$pkgname/archive/$pkgver.tar.gz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	install -Dm 755 aha \
+		"$pkgdir"/usr/bin/aha || return 1
+	install -Dm 644 aha.1 \
+		"$pkgdir"/usr/share/man/man1/aha.1 || return 1
+}
+
+sha512sums="640fc0b802fbe026152143e66a2ef5e7e36342dfab01a1f4ed4a543d0fc822a7377a2434f1d5fca917126740eb102a7c6dd232e9c15815d5ca7ef80a4cb27e4b  aha-0.4.10.6.tar.gz"

@@ -1,0 +1,26 @@
+# Maintainer: Marian <m.buschsieweke@uni-muenster.de>
+pkgname=cmark
+pkgver=0.28.0
+pkgrel=0
+pkgdesc="C reference implementation of CommonMark, a rationalized Markdown spec"
+url="https://github.com/jgm/cmark"
+arch="all"
+license="BSD"
+depends=""
+depends_dev=""
+makedepends="re2c cmake"
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/jgm/cmark/archive/${pkgver}.tar.gz"
+
+builddir="$srcdir"/$pkgname-$pkgver
+build() {
+	cd "$builddir"
+	make INSTALL_PREFIX=/usr || return 1
+}
+
+package() {
+	cd "$builddir"
+	make INSTALL_PREFIX=/usr DESTDIR="$pkgdir" install || return 1
+}
+
+sha512sums="86aeb42f17440c8e743057851bc3cee9ed4b3fa27dacc37d6af54dee7739210a712020e59c102ed1852b7c3f904881cb4e9b80ea475772095514c4025284cbb6  cmark-0.28.0.tar.gz"

@@ -1,0 +1,35 @@
+#! /bin/bash
+# This script is a trampoline to detect shells and versions
+# ...but only Bash 3+ is supported at the moment.
+
+# First, make sure this script is being sourced
+case "$0" in
+*/CmdlineGL.lib)
+	echo "Usage: source /path/to/CmdlineGL.lib"
+	exit 1
+	;;
+esac
+
+# Then figure out where the lib path is
+CmdlineGL_SharePath="@share_path@" # set by "make install"
+if [ ! -d "@share_path@" ]; then
+	# Running from project dir, before "make install"
+	CmdlineGL_SharePath="${BASH_SOURCE%/*}"
+fi
+if [ ! -d "$CmdlineGL_SharePath/lib-bash" ]; then
+	echo "Can't determine CmdlineGL share path (checked for '$CmdlineGL_SharePath/lib-bash')"
+	return 1
+fi
+
+# Force safe defaults for paths.  Caller can modify these afterward.
+CmdlineGL_TexPath="$CmdlineGL_SharePath/textures"
+CmdlineGL_FontPath="$CmdlineGL_SharePath/fonts"
+# Then load the lib appropriate for this shell.  Right now bash is the only supported shell.
+if [ -n "$BASH_VERSION" ]; then
+	CmdlineGL_LibPath="$CmdlineGL_SharePath/lib-bash"
+	source "$CmdlineGL_SharePath/lib-bash/CmdlineGL.lib"
+else
+	echo "You must source this libary from bash."
+	echo "No other shells are currently supported."
+	return 1;
+fi

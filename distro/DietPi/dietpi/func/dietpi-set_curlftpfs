@@ -1,0 +1,99 @@
+#!/bin/bash
+{
+	#////////////////////////////////////
+	# DietPi Function:
+	# - Setup and apply DietPi curlftpfs details
+	#
+	#////////////////////////////////////
+	# Created by Daniel Knight / daniel.knight@dietpi.com / dietpi.com
+	#
+	#////////////////////////////////////
+	#
+	# Info:
+	# - Menu system that allows users to change curlftpfs details stored in dietpi.txt and automatically mount.
+	# - Applies details to /etc/fstab
+	# - Mounts to /mnt/ftp_client if successful
+	#
+	# Usage:
+	# - /DietPi/dietpi/func/dietpi-set_curlftpfs	= Menu
+	# - /DietPi/dietpi/func/dietpi-set_curlftpfs 1	= Apply and mount using settings in dietpi.txt
+	#////////////////////////////////////
+
+	#Grab Input
+	INPUT=0
+	if [[ $1 =~ ^-?[0-9]+$ ]]; then
+		INPUT=$1
+	fi
+
+	#Import DietPi-Globals ---------------------------------------------------------------
+	. /DietPi/dietpi/func/dietpi-globals
+	export G_PROGRAM_NAME='DietPi-Set_curlftpfs'
+	#Import DietPi-Globals ---------------------------------------------------------------
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#curlftpfs data
+	#/////////////////////////////////////////////////////////////////////////////////////
+	OPTION=0
+	CHOICE=0
+	curlftpfs_clientaddress=$(cat /DietPi/dietpi.txt | grep -m1 '^CONFIG_CURLFTPFS_ADDRESS=' | sed 's/.*=//')
+	curlftpfs_clientusername=$(cat /DietPi/dietpi.txt | grep -m1 '^CONFIG_CURLFTPFS_USERNAME=' | sed 's/.*=//')
+	curlftpfs_clientpassword=$(cat /DietPi/dietpi.txt | grep -m1 '^CONFIG_CURLFTPFS_PASSWORD=' | sed 's/.*=//')
+
+	Apply_And_Mount(){
+
+		#Apply to fstab
+		sed -i "/\/mnt\/ftp_client/c\curlftpfs#$curlftpfs_clientusername:$curlftpfs_clientpassword@$curlftpfs_clientaddress \/mnt\/ftp_client fuse auto,allow_other,direct_io,transform_symlinks,user,uid=1000,nonempty,_netdev 0  0" /etc/fstab
+
+		#Mount up
+		mount -a
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Main Loop
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#-----------------------------------------------------------------------------------
+	#Menu
+	if (( $INPUT == 0 )); then
+		OPTION=$(whiptail --inputbox "Please enter the FTP server URL or IP address\n - eg: dietpi.com" 9 65 "$curlftpfs_clientaddress" --title "CurlFTPfs Setup" 3>&1 1>&2 2>&3)
+		CHOICE=$?
+		if (( $CHOICE == 0 )); then
+			curlftpfs_clientaddress=$OPTION
+
+			#Username
+			OPTION=$(whiptail --inputbox "Please enter the FTP username\n - eg: JoeBloggs" 9 65 "$curlftpfs_clientusername" --title "CurlFTPfs Setup" 3>&1 1>&2 2>&3)
+			CHOICE=$?
+			if (( $CHOICE == 0 )); then
+				curlftpfs_clientusername=$OPTION
+
+				#Password
+				OPTION=$(whiptail --inputbox "Please enter the FTP password\n - eg: LetMeIn\n - (NOTICE) This will be stored with no encryption" 9 65 "$curlftpfs_clientpassword" --title "CurlFTPfs Setup" 3>&1 1>&2 2>&3)
+				CHOICE=$?
+				if (( $CHOICE == 0 )); then
+					curlftpfs_clientpassword=$OPTION
+
+					#Unmount if connected
+					clear
+					echo -e "\n\n Attempting mount, please wait...."
+					umount /mnt/ftp_client &> /dev/null
+
+					#Save to Dietpi.txt
+					sed -i "/CONFIG_CURLFTPFS_ADDRESS/c\CONFIG_CURLFTPFS_ADDRESS=$curlftpfs_clientaddress" /DietPi/dietpi.txt
+					sed -i "/CONFIG_CURLFTPFS_USERNAME/c\CONFIG_CURLFTPFS_USERNAME=$curlftpfs_clientusername" /DietPi/dietpi.txt
+					sed -i "/CONFIG_CURLFTPFS_PASSWORD/c\CONFIG_CURLFTPFS_PASSWORD=$curlftpfs_clientpassword" /DietPi/dietpi.txt
+
+					Apply_And_Mount
+				fi
+			fi
+		fi
+
+	#-----------------------------------------------------------------------------------
+	#Apply and mount. Using settings from dietpi.txt
+	elif (( $INPUT == 1 )); then
+		Apply_And_Mount
+	fi
+
+	#-----------------------------------------------------------------------------------
+	exit
+	#-----------------------------------------------------------------------------------
+}

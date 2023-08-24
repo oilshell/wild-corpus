@@ -1,0 +1,114 @@
+# Contributor: Francisco Guerreiro <francisg@fnop.net>
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Contributor: Cameron Banta <cbanta@gmail.com>
+# Contributor: Ashley Sommer <ashleysommer@gmail.com>
+# Maintainer: Cameron Banta <cbanta@gmail.com>
+pkgname=rsyslog
+pkgver=8.27.0
+pkgrel=0
+pkgdesc="Enhanced multi-threaded syslogd with database support and more."
+url="http://www.rsyslog.com/"
+arch="all"
+license="GPLv3 LGPL3"
+depends=""
+makedepends="zlib-dev gnutls-dev mariadb-dev postgresql-dev net-snmp-dev
+	libnet-dev libgcrypt-dev libee-dev libestr-dev liblogging-dev
+	libfastjson-dev util-linux-dev py-docutils hiredis-dev"
+subpackages="$pkgname-doc $pkgname-mysql $pkgname-pgsql $pkgname-tls
+	$pkgname-snmp $pkgname-hiredis $pkgname-dbg"
+source="http://www.rsyslog.com/files/download/$pkgname/$pkgname-$pkgver.tar.gz
+	$pkgname.initd
+	$pkgname.confd
+	$pkgname.logrotate
+	$pkgname.conf
+	musl-fix.patch
+	queue.patch
+	"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--disable-rfc3195 \
+		--enable-largefile \
+		--enable-imdiag \
+		--enable-imfile \
+		--enable-mail \
+		--enable-omprog \
+		--enable-omstdout \
+		--enable-omudpspoof \
+		--enable-imptcp \
+		--enable-impstats \
+		--enable-mysql \
+		--enable-pgsql \
+		--enable-gnutls \
+		--enable-snmp \
+		--enable-omhiredis \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+
+	make DESTDIR="$pkgdir" install || return 1
+
+	install -m755 -D "$srcdir"/$pkgname.initd "$pkgdir"/etc/init.d/$pkgname
+	install -m644 -D "$srcdir"/$pkgname.confd "$pkgdir"/etc/conf.d/$pkgname
+	install -m644 -D "$srcdir"/$pkgname.logrotate "$pkgdir"/etc/logrotate.d/$pkgname
+	install -m644 -D "$srcdir"/$pkgname.conf "$pkgdir"/etc/$pkgname.conf
+}
+
+mysql() {
+	pkgdesc="rsyslog mysql support"
+
+	mkdir -p "$subpkgdir"/usr/lib/rsyslog/
+	mv "$pkgdir"/usr/lib/rsyslog/ommysql.so \
+		"$subpkgdir"/usr/lib/rsyslog/ || return 1
+}
+
+hiredis(){
+	pkgdesc="rsyslog hiredis support"
+
+	mkdir -p "$subpkgdir"/usr/lib/rsyslog/
+	mv "$pkgdir"/usr/lib/rsyslog/omhiredis.so \
+		"$subpkgdir"/usr/lib/rsyslog/ || return 1
+}
+
+pgsql() {
+	pkgdesc="rsyslog pgsql support"
+
+	mkdir -p "$subpkgdir"/usr/lib/rsyslog/
+	mv "$pkgdir"/usr/lib/rsyslog/ompgsql.so \
+		"$subpkgdir"/usr/lib/rsyslog/ || return 1
+}
+
+tls() {
+	pkgdesc="rsyslog tls support"
+
+	mkdir -p "$subpkgdir"/usr/lib/rsyslog/
+	mv "$pkgdir"/usr/lib/rsyslog/lmnsd_gtls.so \
+		"$subpkgdir"/usr/lib/rsyslog/ || return 1
+}
+
+snmp() {
+	pkgdesc="rsyslog snmp support"
+
+	mkdir -p "$subpkgdir"/usr/lib/rsyslog/
+	mv "$pkgdir"/usr/lib/rsyslog/omsnmp.so \
+		"$subpkgdir"/usr/lib/rsyslog/ || return 1
+}
+
+sha512sums="dad957c21d9f7ed3a97a1ed87658fe9381dad00365bd2f5af2396dde3dc4a9f96db17c4df9eb9bd02562cc538f99bf8e2ca00229680d6b7892179161265db753  rsyslog-8.27.0.tar.gz
+9a4b184076a82e0899da79ab3749e1c67eac03f36c4460d34ed0385f4a3ffad53681a1cc25dd514e835c9399a9abd01c235743535ad549d5be7f66d9e127b9dc  rsyslog.initd
+a4d969671800227129be870b0318961b79d16365663754111a136734bbf7005abd4da24853dfdc07b3b6691ab5a7b215f0ac6c19022b4c5c8dab06165a42431b  rsyslog.confd
+d54377ddf39197656811a84272568ea761f984e19dd04fc54f372dd04a9244e66d02b26ab33073d0344d054f031660ec611f3c7a18c266e7b68cef5e2c47f06f  rsyslog.logrotate
+3bcd58b222eb7f4d8a42a0643cacb6ab44790f90c9bd550678e002bc19863d5d6a7341e5e5ba0b9292f85c6c04cd5cc42d174acdc63e8ba22022620db10f2b9b  rsyslog.conf
+20967235e8233588210071a7157a81fe02a1e88d7c7f55855fcc2fe34295269a6e3e3bfccb3d4dd83a6a48da28948c92d6ce47a0c5d817f6b6a4030635f4f896  musl-fix.patch
+7be105f9a30d23b48ee46e19d31ba37ec30477935a9f7ba3929666a9abe175313dbb7caf55fbb1c6579dd5d25fe037eea84cae9065fe3f765f23569344bce5d7  queue.patch"

@@ -1,0 +1,33 @@
+# Contributor: Marian Buschsieweke <marian.buschsieweke@ovgu.de>
+# Maintainer: Timo Teräs <timo.teras@iki.fi>
+pkgname=raspberrypi-bootloader
+pkgver=1.20170427
+pkgrel=0
+pkgdesc="Bootloader files for the Raspberry Pi"
+url=https://github.com/raspberrypi/firmware
+arch="armhf"
+license="custom"
+depends=""
+makedepends=""
+install=
+options="!check !strip"
+source="$pkgname-$pkgver.tar.gz::https://github.com/raspberrypi/firmware/archive/$pkgver.tar.gz"
+subpackages="$pkgname-x:bootloader_x"
+
+builddir="${srcdir}/firmware-${pkgver}"
+package() {
+	cd "$builddir"/boot
+	mkdir -p "$pkgdir"/boot
+	cp bootcode.bin fixup.dat start.elf "$pkgdir"/boot/
+}
+
+bootloader_x() {
+	pkgdesc="Extra codecs for the Raspberry Pi"
+	depends="$pkgname"
+	cd "$builddir"/boot
+	mkdir -p "$subpkgdir"/boot
+	cp start_x.elf start_cd.elf start_db.elf fixup_x.dat fixup_cd.dat fixup_db.dat "$subpkgdir"/boot/
+}
+
+
+sha512sums="f643b224201f288c3bba9d78a049b43bf4f8a29dbaff3fbeb12a132cdf3ccd5747ee04de7535105600740510e2e07dd0e25f2082592ab89c4d205807e4ae05cf  raspberrypi-bootloader-1.20170427.tar.gz"

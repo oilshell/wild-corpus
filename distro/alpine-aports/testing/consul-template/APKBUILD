@@ -1,0 +1,33 @@
+# Contributor: Gennady Feldman <gena01@gmail.com>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=consul-template
+pkgver=0.18.5
+pkgrel=0
+pkgdesc="Generic template rendering and notifications with Consul"
+url="https://www.consul.io/"
+arch="all"
+license="MPL-2.0"
+depends=""
+makedepends="go"
+options="!strip !check"
+source="$pkgname-$pkgver.tar.gz::https://github.com/hashicorp/$pkgname/archive/v$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+
+	mkdir -p "$builddir/src/github.com/hashicorp"
+	ln -s "$builddir" "$builddir/src/github.com/hashicorp/$pkgname"
+	cd "$builddir/src/github.com/hashicorp/$pkgname" || return 1
+
+	GOPATH="$builddir" go build -v -o bin/$pkgname
+}
+
+package() {
+	cd "$builddir"
+
+	# Main binary
+	install -m750 -D bin/$pkgname "$pkgdir"/usr/sbin/$pkgname
+}
+
+sha512sums="1709c889cd414d2b3510400e8077aec49006c31958618a38f6bce78dad2ba4aac5405410b030bf968b5cf148f4cfbe963ccf95a015cd1e58f2f6d1f09edc13de  consul-template-0.18.5.tar.gz"

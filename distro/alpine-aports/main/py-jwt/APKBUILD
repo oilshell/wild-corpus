@@ -1,0 +1,63 @@
+# Maintainer: Eivind Uggedal <eivind@uggedal.com>
+pkgname=py-jwt
+_pkgname=PyJWT
+pkgver=1.5.0
+pkgrel=0
+pkgdesc="Python JSON Web Token implementation"
+url="https://github.com/progrium/pyjwt"
+arch="noarch"
+license="MIT"
+depends=""
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="$pkgname-cli py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+check() {
+    cd "$builddir"
+    python2 setup.py check
+    python3 setup.py check
+}
+
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+	python3 setup.py build
+}
+
+package() {
+	cd "$builddir"
+	python2 setup.py install --prefix=/usr --root="$pkgdir"
+	python3 setup.py install --prefix=/usr --root="$pkgdir"
+}
+
+cli() {
+	pkgdesc="$pkgdesc (CLI utility)"
+	depends="py3-jwt"
+
+	mkdir -p "$subpkgdir"/usr/
+	mv "$pkgdir"/usr/bin "$subpkgdir"/usr/
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+	local libpath="$($python -c 'import sysconfig; print(sysconfig.get_path("stdlib"))')"
+
+	mkdir -p "$subpkgdir"${libpath%/*}
+	mv "$pkgdir"$libpath "$subpkgdir"${libpath%/*}
+}
+
+sha512sums="6a811933fc167a5b79a8e0c3cd95154f80e115d50795b4b4593abd95922ff330649b9f6cd8698191c3fb35b27b1b6870702c835eec28306b5349ef8d8d836d04  PyJWT-1.5.0.tar.gz"

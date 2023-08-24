@@ -1,0 +1,532 @@
+#!/bin/bash
+{
+	#////////////////////////////////////
+	# DietPi Services Script
+	#
+	#////////////////////////////////////
+	# Created by Daniel Knight / daniel.knight@dietpi.com / dietpi.com
+	#
+	# Info:
+	# - Allows service control for all listed programs used in dietpi-software
+	# - Disable removes the autostart from init.d and systemD. This allows DietPi to control program services below.
+	#
+	# Usage:
+	# - /DietPi/dietpi/dietpi-services $AVAILABLE_OPTIONS
+	#////////////////////////////////////
+	AVAILABLE_OPTIONS='
+ - start/stop/restart/status (all services, known to DietPi)
+ - start/stop/restart servicename (single service, SystemD)
+ - systemd_controlled/dietpi_controlled (all services, known to DietPi)
+ - enable/disable servicename (single service, SystemD)
+ - enable/disable all (all services, known to DietPi)
+ - mask/unmask servicename (single service, SystemD)'
+
+	#Grab Inputs
+	INPUT_MODE="$1"
+	INPUT_S2="$2"
+
+	#Import DietPi-Globals ---------------------------------------------------------------
+	. /DietPi/dietpi/func/dietpi-globals
+	G_CHECK_ROOT_USER
+	export G_PROGRAM_NAME='DietPi-Services'
+	#Import DietPi-Globals ---------------------------------------------------------------
+
+	aSERVICE_NAME=(
+		'cron'
+		'transmission-daemon'
+		'proftpd'
+		'smbd'
+		'nmbd'
+		'nfs-kernel-server'
+		'vsftpd'
+		'apache2'
+		'nginx'
+		'lighttpd'
+		'php5-fpm'
+		'php7.0-fpm'
+		'mysql'
+		'mpd'
+		'ympd'
+		'minidlna'
+		'noip2'
+		'grasshopper'
+		'dnsmasq'
+		'pihole-FTL'
+		'subsonic'
+		'webiopi'
+		'haproxy'
+		'fail2ban'
+		'openvpn'
+		'isc-dhcp-server'
+		'hostapd'
+		'avahi-daemon'
+		'shairport-sync'
+		'squeezelite'
+		'mopidy'
+		#'mariadb' #: https://github.com/Fourdee/DietPi/issues/1000#issuecomment-307760517
+		'redis-server'
+		'emonhub'
+		'netdata'
+		'mumble-server'
+		'emby-server'
+		'plexmediaserver'
+		'cuberite'
+		'supervisor'
+		'gogs'
+		'qbittorrent'
+		'syncthing'
+		'syncthing-inotify'
+		'rtorrent'
+		'urbackupsrv'
+		'sickrage'
+		'roonbridge'
+		'mosquitto'
+		'networkaudiod'
+		'node-red'
+		'tomcat8'
+		'rpimonitor'
+		'openmediavault-engined'
+		'blynkserver'
+		'aria2'
+		'yacy'
+		'tonido'
+		'icecast2'
+		'darkice'
+		'motioneye'
+		'cups'
+		'cloudprintd'
+		'virtualhere'
+		'sabnzbd'
+		'spotify-connect-web'
+		'couchpotato'
+		'koel'
+		'sonarr'
+		'radarr'
+		'plexpy'
+		'jackett'
+		'nzbget'
+		'octoprint'
+		'roonserver'
+		'htpc-manager'
+		'home-assistant'
+		'openbazaar'
+		#'dietpi-wifi-monitor' : https://github.com/Fourdee/DietPi/issues/1288#issuecomment-350653480
+		'docker'
+		'bdd'
+		'minio'
+		'gmrender'
+		'nukkit'
+		'gitea'
+		'pi-spc'
+		'raspotify'
+		#'moode-worker'
+		'voice-recognizer'
+		'alsa-init'
+	)
+
+	# - User: read custom services file
+	FP_INCLUDE_SERVICES='/DietPi/dietpi/.dietpi-services_include'
+	if [ -f "$FP_INCLUDE_SERVICES" ]; then
+
+		while read line
+		do
+
+			index=${#aSERVICE_NAME[@]}
+			aSERVICE_NAME[$index]="$line"
+
+		done < "$FP_INCLUDE_SERVICES"
+
+	fi
+
+	#init
+	aSERVICE_AVAILABLE=0
+	for ((i=0; i<${#aSERVICE_NAME[@]}; i++))
+	do
+		aSERVICE_AVAILABLE[$i]=0
+
+	done
+
+	#Check if service name is available on system.
+	Populate_Available_Array()
+	{
+
+		#Find dpkg program names
+		dpkg --get-selections | awk '{print $1}' > "$FP_TEMP"
+
+		for ((i=0; i<${#aSERVICE_NAME[@]}; i++))
+		do
+
+			if [ -f /etc/systemd/system/${aSERVICE_NAME[$i]}.service ] ||
+				[ -f /lib/systemd/system/${aSERVICE_NAME[$i]}.service ]; then
+
+				aSERVICE_AVAILABLE[$i]=1
+
+			elif [ -f /etc/init.d/${aSERVICE_NAME[$i]} ]; then
+
+				aSERVICE_AVAILABLE[$i]=1
+
+			# - Check dpkg for matching packages.
+			elif (( $(grep -ci -m1 "^${aSERVICE_NAME[$i]}$" "$FP_TEMP") )); then
+
+				aSERVICE_AVAILABLE[$i]=1
+
+			fi
+
+		done
+
+	}
+
+	Print_Status()
+	{
+
+		#$1 = Method
+		#$2 = name
+		#$3 = exit code
+
+		#	NB: SystemD exit code 5 = not loaded/active, so dont trigger a failed result.
+
+		#ok
+		if (( $3 == 0 || $3 == 5 )); then
+
+			G_DIETPI-NOTIFY 0 "$1 : $2"
+
+		#failed
+		else
+
+			G_DIETPI-NOTIFY 1 "$1 : $2"
+
+		fi
+
+	}
+
+	#$1 = mode (eg: start/stop/restart)
+	Set_Running_State(){
+
+		local target_state="$1"
+
+		#????????????????????????????????????????????????????????????????????????
+		# Although this allows for simple service control without using SystemD, we really should convert these to SystemD services. To keep everything consistent, clean, and obtain a correct exit code.
+		#DietPi: Non-service based control for specific dietpi-software installed programs.
+		# - Start order first
+		index=0
+		aDIETPISERVICE_FP=()
+		aDIETPISERVICE_NAME=()
+		aDIETPISERVICE_NAME[$index]='BruteFIR';aDIETPISERVICE_FP[$index]='/var/lib/dietpi/dietpi-software/services/brutefir.service';((index++));
+		aDIETPISERVICE_NAME[$index]='JackD';aDIETPISERVICE_FP[$index]='/var/lib/dietpi/dietpi-software/services/jackd.service';((index++));
+		aDIETPISERVICE_NAME[$index]='Jconvolver';aDIETPISERVICE_FP[$index]='/var/lib/dietpi/dietpi-software/services/jconvolver.service';((index++));
+
+		for ((i=0; i<${#aDIETPISERVICE_NAME[@]}; i++))
+		do
+
+			if [ -f ${aDIETPISERVICE_FP[$i]} ]; then
+
+				G_DIETPI-NOTIFY -2 "${aDIETPISERVICE_NAME[$i]}"
+
+				${aDIETPISERVICE_FP[$i]} $target_state &> /dev/null
+				Print_Status $target_state ${aDIETPISERVICE_NAME[$i]} $?
+
+			fi
+
+		done
+
+		unset aDIETPISERVICE_NAME
+		unset aDIETPISERVICE_FP
+		#????????????????????????????????????????????????????????????????????????
+
+		#### ALLO Special ####
+		aALLO_EXCLUDED_SERVICES_DURING_STOP=(
+			'apache2'
+			'nginx'
+			'lighttpd'
+			'php5-fpm'
+			'php7.0-fpm'
+			'mysql'
+			'avahi-daemon'
+		)
+		#### ALLO Special ####
+
+		#Linux: installed services
+		for ((i=0; i<${#aSERVICE_NAME[@]}; i++))
+		do
+
+			#### ALLO Special ####
+			# - Allo web interface image: Exclude stop on aALLO_EXCLUDED_SERVICES_DURING_STOP service list
+			if [ -d /var/www/allo ] && [ "$target_state" = "stop" ]; then
+
+				for ((j=0; j<${#aALLO_EXCLUDED_SERVICES_DURING_STOP[@]}; j++))
+				do
+
+					if [ "${aSERVICE_NAME[$i]}" = "${aALLO_EXCLUDED_SERVICES_DURING_STOP[$j]}" ]; then
+
+						aSERVICE_AVAILABLE[$i]=0
+						break
+
+					fi
+
+				done
+
+			fi
+			#### ALLO Special ####
+
+			#Apply
+			if (( ${aSERVICE_AVAILABLE[$i]} == 1 )); then
+
+				G_DIETPI-NOTIFY -2 "${aSERVICE_NAME[$i]}"
+
+				systemctl $target_state ${aSERVICE_NAME[$i]} &> /dev/null
+
+				Print_Status $target_state ${aSERVICE_NAME[$i]} $?
+
+			fi
+
+		done
+
+		unset aALLO_EXCLUDED_SERVICES_DURING_STOP
+
+		#????????????????????????????????????????????????????????????????????????
+		# Although this allows for simple service control without using SystemD, we really should convert these to SystemD services. To keep everything consistent, clean, and obtain a correct exit code.
+		#DietPi: Non-service based control for specific dietpi-software installed programs.
+		# - Start prority last
+		index=0
+		aDIETPISERVICE_FP=()
+		aDIETPISERVICE_NAME=()
+		aDIETPISERVICE_NAME[$index]='RaspimJpeg';aDIETPISERVICE_FP[$index]='/var/lib/dietpi/dietpi-software/services/raspimjpeg.service';((index++));
+		aDIETPISERVICE_NAME[$index]='Deluge';aDIETPISERVICE_FP[$index]='/var/lib/dietpi/dietpi-software/services/deluge.service';((index++));
+		aDIETPISERVICE_NAME[$index]='SqueezeBox Server';aDIETPISERVICE_FP[$index]='/var/lib/dietpi/dietpi-software/services/squeezeboxserver.service';((index++));
+
+		for ((i=0; i<${#aDIETPISERVICE_NAME[@]}; i++))
+		do
+
+			if [ -f ${aDIETPISERVICE_FP[$i]} ]; then
+
+				G_DIETPI-NOTIFY -2 "${aDIETPISERVICE_NAME[$i]}"
+
+				${aDIETPISERVICE_FP[$i]} $target_state &> /dev/null
+				Print_Status $target_state ${aDIETPISERVICE_NAME[$i]} $?
+
+			fi
+
+		done
+
+		unset aDIETPISERVICE_NAME
+		unset aDIETPISERVICE_FP
+		#????????????????????????????????????????????????????????????????????????
+
+		echo -e ""
+
+		#Apply process tool settings
+		if [ "$target_state" = "start" ] ||
+			[ "$target_state" = "restart" ]; then
+
+			/DietPi/dietpi/dietpi-process_tool 1
+
+		fi
+
+	}
+
+	FP_TEMP="/tmp/.dietpi-services_installed"
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Main
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#Info
+	G_DIETPI-NOTIFY 3 DietPi-Services "$INPUT_MODE"
+
+	#Obtain an array of available services installed on system.
+	Populate_Available_Array
+
+	#-----------------------------------------------------------------------------------
+	#dietpi_controlled/systemd_controlled
+	if [ "$INPUT_MODE" = 'dietpi_controlled' ] ||
+		[ "$INPUT_MODE" = 'systemd_controlled' ]; then
+
+		SYSTEMD_CMD='disable'
+
+		if [ "$INPUT_MODE" = "systemd_controlled" ]; then
+
+			SYSTEMD_CMD='enable'
+
+		fi
+
+		for ((i=0; i<${#aSERVICE_NAME[@]}; i++))
+		do
+
+			#Apply
+			if (( ${aSERVICE_AVAILABLE[$i]} == 1 )); then
+
+				G_DIETPI-NOTIFY -2 "${aSERVICE_NAME[$i]}"
+
+				systemctl $SYSTEMD_CMD ${aSERVICE_NAME[$i]} &> /dev/null
+
+				Print_Status $INPUT_MODE ${aSERVICE_NAME[$i]} $?
+
+			fi
+
+		done
+
+		systemctl daemon-reload &> /dev/null
+
+		echo -e ""
+
+	#-----------------------------------------------------------------------------------
+	#mask/unmask/enable/disable
+	elif [ "$INPUT_MODE" = "enable" ] ||
+		[ "$INPUT_MODE" = "disable" ] ||
+		[ "$INPUT_MODE" = "unmask" ] ||
+		[ "$INPUT_MODE" = "mask" ]; then
+
+		#Switch to mask, as DietPi_Controlled uses disable to take over from SystemD
+		SYSTEMD_CMD='mask'
+		if [ "$INPUT_MODE" = "enable" ] ||
+			[ "$INPUT_MODE" = "unmask" ]; then
+
+			SYSTEMD_CMD='unmask'
+
+		fi
+
+		# - Process ALL known services
+		if [ "$INPUT_S2" = 'all' ]; then
+
+			if [ "$INPUT_MODE" = "disable" ] ||
+				[ "$INPUT_MODE" = "mask" ]; then
+
+				echo -e ""
+				Set_Running_State stop
+
+			fi
+
+			for ((i=0; i<${#aSERVICE_NAME[@]}; i++))
+			do
+
+				if (( ${aSERVICE_AVAILABLE[$i]} )); then
+
+
+					G_DIETPI-NOTIFY 0 "$INPUT_MODE $INPUT_S2: ${aSERVICE_NAME[$i]}"
+					systemctl $SYSTEMD_CMD ${aSERVICE_NAME[$i]}
+
+				fi
+
+			done
+
+
+		# - Process user defined single entry via cmd input
+		else
+
+			systemctl stop $INPUT_S2
+
+			systemctl $SYSTEMD_CMD $INPUT_S2
+			if (( $? == 0 )); then
+
+				G_DIETPI-NOTIFY 0 "$INPUT_MODE $INPUT_S2"
+
+			else
+
+				G_DIETPI-NOTIFY 1 "$INPUT_MODE $INPUT_S2"
+
+			fi
+
+		fi
+
+		systemctl daemon-reload &> /dev/null
+
+		if [ "$INPUT_MODE" = "unmask" ] ||
+			[ "$INPUT_MODE" = "enable" ]; then
+
+			echo -e ""
+			Set_Running_State start
+
+		fi
+
+		echo -e ""
+
+	#-----------------------------------------------------------------------------------
+	#status
+	elif [ "$INPUT_MODE" = "status" ]; then
+
+		for ((i=0; i<${#aSERVICE_NAME[@]}; i++))
+		do
+
+			#Apply
+			if (( ${aSERVICE_AVAILABLE[$i]} == 1 )); then
+
+				STATUS="${aSERVICE_NAME[$i]}\t$(systemctl status ${aSERVICE_NAME[$i]} | grep -m1 'Active' | cut -c12-)"
+
+				if [[ "$STATUS" =~ .*'failed'.* ]]; then
+
+					G_DIETPI-NOTIFY 1 "$STATUS"
+					systemctl status "${aSERVICE_NAME[$i]}" -l --no-pager
+
+				elif [[ "$STATUS" =~ .*'inactive'.* ]]; then
+
+					G_DIETPI-NOTIFY 2 "$STATUS"
+
+				else
+
+					G_DIETPI-NOTIFY 0 "$STATUS"
+
+				fi
+
+			fi
+
+		done
+
+		echo -e ""
+
+	#-----------------------------------------------------------------------------------
+	#start/stop/restart
+	elif [ "$INPUT_MODE" = "start" ] ||
+		[ "$INPUT_MODE" = "stop" ] ||
+		[ "$INPUT_MODE" = "restart" ]; then
+
+			#Single use case, basically a alias for systemD
+			if [ -n "$INPUT_S2" ]; then
+
+				systemctl $INPUT_MODE $INPUT_S2 &> /dev/null
+				if (( $? == 0 )); then
+
+					G_DIETPI-NOTIFY 0 "$INPUT_MODE $INPUT_S2"
+
+				else
+
+					G_DIETPI-NOTIFY 1 "$INPUT_MODE $INPUT_S2"
+
+				fi
+
+				echo -e ""
+
+			#All services controlled
+			else
+
+				# Control ownCloud and Nextcloud maintenance mode:
+				if [ "$INPUT_MODE" = "stop" ] || [ "$INPUT_MODE" = "restart" ]; then
+
+					grep -q "'maintenance' => false," /var/www/owncloud/config/config.php &> /dev/null && G_RUN_CMD occ maintenance:mode --on
+					grep -q "'maintenance' => false," /var/www/nextcloud/config/config.php &> /dev/null && G_RUN_CMD ncc maintenance:mode --on
+
+				fi
+
+				Set_Running_State "$INPUT_MODE"
+
+				# Control ownCloud and Nextcloud maintenance mode:
+				if [ "$INPUT_MODE" = "restart" ] || [ "$INPUT_MODE" = "start" ]; then
+
+					grep -q "'maintenance' => true," /var/www/owncloud/config/config.php &> /dev/null && G_RUN_CMD occ maintenance:mode --off
+					grep -q "'maintenance' => true," /var/www/nextcloud/config/config.php &> /dev/null && G_RUN_CMD ncc maintenance:mode --off
+
+				fi
+
+			fi
+
+	#-----------------------------------------------------------------------------------
+	#Invalid command
+	else
+		G_DIETPI-NOTIFY 2 "Invalid command\e[0m\nAvailable commands:\n$AVAILABLE_OPTIONS\n"
+	fi
+	#-----------------------------------------------------------------------------------
+	rm "$FP_TEMP"
+	unset aSERVICE_NAME
+	unset aSERVICE_AVAILABLE
+	#-----------------------------------------------------------------------------------
+	exit
+	#-----------------------------------------------------------------------------------
+}

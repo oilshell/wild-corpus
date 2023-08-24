@@ -1,0 +1,35 @@
+# Contributor: William Pitcock <nenolod@dereferenced.org>
+# Maintainer: William Pitcock <nenolod@dereferenced.org>
+pkgname=vblade
+pkgver=23
+pkgrel=0
+pkgdesc="A virtual AoE blade server"
+url="http://aoetools.sourceforge.net/"
+arch="all"
+license="GPL2"
+depends=""
+makedepends="linux-headers"
+install=""
+subpackages="$pkgname-doc"
+source="https://github.com/OpenAoE/vblade/archive/vblade-23.tar.gz"
+
+_builddir="$srcdir"/$pkgname-$pkgname-$pkgver
+prepare() {
+	cd "$_builddir"
+}
+
+build() {
+	cd "$_builddir"
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	mkdir -p "$pkgdir"/usr/sbin
+	mkdir -p "$pkgdir"/usr/share/man/man8
+	make sbindir="$pkgdir"/usr/sbin mandir="$pkgdir"/usr/share/man install
+}
+
+md5sums="5aebe341e1ff7d13912d44b16ac23d7d  vblade-23.tar.gz"
+sha256sums="aa3c2035d6b14ab30ef1cee333092fcd5d1509211d737f181833a6a370973b21  vblade-23.tar.gz"
+sha512sums="a27379933b5c0fc84966f47e0ee0089fe978fe77ea38d91c21fb6bb6bc4fa7f393b8b4c57f84c6840b549908eb8666847f121b836e3a076895e038e8096c0cfa  vblade-23.tar.gz"

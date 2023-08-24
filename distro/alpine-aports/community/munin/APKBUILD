@@ -1,0 +1,68 @@
+# Contributor: Sergei Lukin <sergej.lukin@gmail.com>
+# Contributor: Stefan Wagner <stw@bit-strickerei.de>
+# Maintainer: Stefan Wagner <stw@bit-strickerei.de>
+pkgname=munin
+pkgver=2.0.33
+pkgrel=0
+pkgdesc="A distributed monitoring/graphing tool"
+url="http://munin-monitoring.org/"
+arch="noarch"
+license="GPL"
+_perl_modules="perl-rrd perl-net-snmp perl-log-log4perl perl-html-template
+	perl-net-ssleay perl-net-server perl-date-manip perl-io-socket-inet6
+	perl-file-copy-recursive perl-fcgi perl-uri"
+depends="$pkgname-node"
+makedepends="bash rrdtool perl-dev perl-module-build $_perl_modules"
+pkgusers=munin
+pkggroups=munin
+subpackages="$pkgname-node"
+source="http://downloads.munin-monitoring.org/munin/stable/$pkgver/$pkgname-$pkgver.tar.gz
+	munin-config.patch
+	$pkgname.crond
+	$pkgname-node.initd
+	$pkgname.logrotate
+	$pkgname-node.logrotate"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	make -j1
+}
+
+package() {
+	cd "$builddir"
+
+	make DESTDIR="$pkgdir" install-master-prime || return 1
+	rm -rf "$pkgdir"/usr/share/man
+
+	install -m644 -D "$srcdir"/$pkgname.crond \
+		"$pkgdir"/etc/munin/munin.cron.sample || return 1
+	install -m644 -D "$srcdir"/$pkgname.logrotate \
+		"$pkgdir"/etc/logrotate.d/$pkgname || return 1
+
+	install -d -o $pkgusers -g $pkggroups "$pkgdir"/usr/share/webapps/munin/html
+}
+
+node() {
+	depends="bash rrdtool perl $_perl_modules"
+	install="$subpkgname.pre-install"
+
+	cd "$builddir"
+
+	mkdir -p "$subpkgdir"
+	make DESTDIR="$subpkgdir" install-common-prime install-node-prime \
+		install-plugins-prime || return 1
+	rm -rf "$subpkgdir"/usr/share/man
+
+	install -m644 -D "$srcdir"/$subpkgname.logrotate \
+		"$pkgdir"/etc/logrotate.d/$subpkgname || return 1
+	install -m755 -D "$srcdir"/$subpkgname.initd \
+		"$subpkgdir"/etc/init.d/$subpkgname
+}
+
+sha512sums="aa6df8555dfd09585619376a4e9f20c2c6092e70076041ff3dcf987f6eab3caf2880ce32432f71f7b0493808d9e5dbc11e352aa636c39f22ad355409342feb70  munin-2.0.33.tar.gz
+a1c691a4c5d7d2619ea6d2605c71a23eeaa65f9cf533477524927bc3244371e271a4dadf24e71d6630f3ea8d6ad56f26bed83330a22ff0573e67c5cafe66cf17  munin-config.patch
+194b742b2ff8312c4c42a8a77d1d9a80bc53ced2343248c36f4229b0b0d366e898487fb5e415f1f5ccea7210a7a86e25de5e45193dbb5d26d2d6a195f0597642  munin.crond
+4b2a49a7bcb64eef65eee3b77ce86ca2cd8afef681922fdb830cb382f334c07356576f1151f4423f066ba8ac1c2d9a51cf9ff3d4dd4b18a5c1e2c95abcd9a940  munin-node.initd
+0f4768033f63103cb41b3f3869ebe378098f85409a909afa311a49587cb6afcffe2b2199821cd41a08f41bbeba3d37121561406978960e3345fbccfd230040e6  munin.logrotate
+34cdc04e83067d2fc839efaf06d96da892d76b77555a4b7b633f9a88fb86dc5f4413fe7a4f6c540e95724b23e8a4ad0ff37f521d44046bfcf18cb0428b94e6e2  munin-node.logrotate"

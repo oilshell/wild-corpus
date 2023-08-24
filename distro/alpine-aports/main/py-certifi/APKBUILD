@@ -1,0 +1,53 @@
+# Maintainer: Peter Bui <pnutzh4x0r@gmail.com>
+pkgname=py-certifi
+_pkgname=certifi
+pkgver=2017.7.27.1
+pkgrel=0
+pkgdesc="Python package for providing Mozilla's CA Bundle"
+url="https://pypi.python.org/pypi/certifi"
+arch="noarch"
+license="ISC"
+depends=""
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+check() {
+	cd "$builddir"
+
+	python2 setup.py check
+	python3 setup.py check
+}
+
+build() {
+	cd "$builddir"
+
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+sha512sums="2873c17144e09ba506c62743efa4fda05350d48fcb19a1b8eb895829df2fa276eed86b31c9f7f18636f62ea5acb4bc6b9dee8b69ed8e0ccd1286ebfaa27d02a1  certifi-2017.7.27.1.tar.gz"

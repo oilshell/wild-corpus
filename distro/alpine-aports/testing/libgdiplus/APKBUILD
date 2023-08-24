@@ -1,0 +1,49 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer:
+pkgname=libgdiplus
+pkgver=4.2
+pkgrel=2
+pkgdesc="An Open Source Implementation of the GDI+ API"
+url="http://www.mono-project.com"
+arch="all"
+license="LGPL"
+depends=""
+depends_dev="tiff-dev cairo-dev libexif-dev glib-dev"
+makedepends="$depends_dev"
+install=""
+subpackages="$pkgname-dev"
+source="http://download.mono-project.com/sources/libgdiplus/libgdiplus-$pkgver.tar.gz"
+
+_builddir="$srcdir"/libgdiplus-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+md5sums="3e68075aa0911d5ebc2b3739e85af0ea  libgdiplus-4.2.tar.gz"
+sha256sums="f332b9b8b44fd1c50b8d8d01a7296360b806c790b8297614739b3de1edbadfeb  libgdiplus-4.2.tar.gz"
+sha512sums="102d1e07a106fa32640a20c4843bf82b3f628c5b7a3813d39c7712f2cd09d80dc5adb337a8d5bdbae065f876a0c433a5d8fcb7d761dff5ee08c48cac2cd2344e  libgdiplus-4.2.tar.gz"

@@ -1,0 +1,47 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libnetfilter_queue
+pkgver=1.0.2
+pkgrel=0
+pkgdesc="API to packets that have been queued by the kernel packet filter"
+url="http://www.netfilter.org/projects/libnetfilter_queue/index.html"
+arch="all"
+license="GPLv2"
+depends=""
+makedepends="libnfnetlink-dev libmnl-dev linux-headers"
+install=""
+subpackages="$pkgname-dev"
+source="http://www.netfilter.org/projects/libnetfilter_queue/files/libnetfilter_queue-$pkgver.tar.bz2"
+
+_builddir="$srcdir"/libnetfilter_queue-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	update_config_sub || return 1
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	export CFLAGS="$CFLAGS -D_GNU_SOURCE"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+sha512sums="89fec4d943b85f35e7cef3b1b9071b1280c6e1b282b7e5cb97eb17d05b9ddd175194639ead986767d27152540fe8e167383a1f7bbfe3cdf874a5a42a2c096f11  libnetfilter_queue-1.0.2.tar.bz2"

@@ -1,0 +1,44 @@
+# Contributor: William Pitcock <nenolod@dereferenced.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=openal-soft
+pkgver=1.18.2
+pkgrel=0
+pkgdesc="software implementation of OpenAL API"
+url="http://kcat.strangesoft.net/openal.html"
+arch="all"
+license="LGPL"
+depends=""
+depends_dev="alsa-lib-dev"
+makedepends="$depends_dev linux-headers cmake"
+install=""
+subpackages="$pkgname-dev"
+source="http://kcat.strangesoft.net/openal-releases/${pkgname}-${pkgver}.tar.bz2"
+options="!check"
+
+builddir="${srcdir}/${pkgname}-${pkgver}"
+
+_builddir="${srcdir}/build"
+prepare() {
+	default_prepare
+	mkdir -p "$_builddir"
+}
+
+build() {
+	local _cpuext_neon=
+	cd "$_builddir"
+	case "$CARCH" in
+		armhf) _cpuext_neon=-DALSOFT_CPUEXT_NEON=OFF;;
+	esac
+	cmake -DCMAKE_INSTALL_PREFIX="/usr" \
+		-DCMAKE_INSTALL_LIBDIR="lib" \
+		$_cpuext_neon \
+		"$builddir"
+	make
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="752e2fb0a5a014caa6d6bac1590d3df46140b463fbaa13378fb5de89f1c97ee8b62bec74f68484d4ec02ee8755c1a2d0c9394cdb477db1b7401deae2fb9eeb4d  openal-soft-1.18.2.tar.bz2"

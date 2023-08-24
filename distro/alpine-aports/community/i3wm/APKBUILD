@@ -1,0 +1,39 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=i3wm
+pkgver=4.14.1
+pkgrel=0
+pkgdesc="A tiling window manager"
+url="http://i3wm.org"
+arch="all"
+license="BSD"
+makedepends="$depends_dev bison flex libxcb-dev xcb-util-cursor-dev
+	xcb-util-keysyms-dev xcb-util-wm-dev libev-dev pango-dev cairo-dev
+	yajl-dev startup-notification-dev pcre-dev libxkbcommon-dev xcb-util-xrm-dev"
+subpackages="$pkgname-doc"
+source="http://i3wm.org/downloads/i3-${pkgver}.tar.bz2
+	musl.patch"
+
+builddir="$srcdir/i3-$pkgver/"
+
+build() {
+	cd "$builddir"
+   	./configure --disable-builddir --prefix="/usr" --sysconfdir="/etc"
+	make
+}
+
+check() {
+	cd "$builddir"
+	./i3 --version
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir/" install
+
+	install -d "$pkgdir/usr/share/man/man1"
+	install -m644 man/*.1 "$pkgdir"/usr/share/man/man1/
+}
+
+sha512sums="ef628af002947b40e1c88b0e872c6e93d4377a9674a120bd9adc3f323a38570b05124cd3047b5a26659e72070de2d00d83fb93186510c74ad8ddbf4f3df85472  i3-4.14.1.tar.bz2
+8ce7d00371c43b93dabbe0dadf9caf7c58a68f4a0079f5a9b9552c15c55bfa0df16d7e87a281595af2ac5254632ba28ccf82a467cea16159b41490f6f2910299  musl.patch"

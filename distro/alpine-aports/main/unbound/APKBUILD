@@ -1,0 +1,97 @@
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=unbound
+pkgver=1.6.6
+pkgrel=0
+pkgdesc="Unbound is a validating, recursive, and caching DNS resolver"
+pkgusers="unbound"
+pkggroups="unbound"
+url="http://unbound.net/"
+arch="all"
+license="BSD"
+depends="dnssec-root"
+depends_dev="libressl-dev expat-dev ldns-dev libevent-dev"
+makedepends="$depends_dev python2-dev swig linux-headers"
+install="$pkgname.pre-install"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-libs $pkgname-dbg py-unbound:py $pkgname-migrate::noarch"
+source="http://unbound.net/downloads/unbound-$pkgver.tar.gz
+	conf.patch
+	update-unbound-root-hints
+	migrate-dnscache-to-unbound
+	root.hints
+	unbound.initd"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		--with-username=unbound \
+		--with-run-dir="" \
+		--with-pidfile=/var/run/unbound/unbound.pid \
+		--with-rootkey-file=/usr/share/dnssec-root/trusted-key.key \
+		--with-libevent \
+		--with-ldns \
+		--with-pthreads \
+		--disable-static \
+		--disable-rpath \
+		--with-ssl \
+		--without-pythonmodule \
+		--with-pyunbound
+
+	# do not link to libpython
+	sed -e '/^LIBS=/s/-lpython.*[[:space:]]/ /' \
+		-i Makefile
+
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	install -D contrib/update-anchor.sh \
+		"$pkgdir"/usr/share/$pkgname/update-anchor.sh
+	install -Dm755 "$srcdir"/update-unbound-root-hints \
+		"$pkgdir"/etc/periodic/monthly/update-unbound-root-hints
+
+	install -m755 -D "$srcdir"/unbound.initd \
+		"$pkgdir"/etc/init.d/unbound
+	install -d -o unbound -g unbound "$pkgdir"/var/run/unbound
+	install -m644 "$srcdir"/root.hints "$pkgdir"/etc/unbound/
+
+	mkdir -p "$pkgdir"/usr/share/doc/$pkgname/
+	install -m644 doc/CREDITS doc/Changelog doc/FEATURES \
+		doc/README doc/TODO "$pkgdir"/usr/share/doc/$pkgname/
+}
+
+libs() {
+	pkgdesc="unbound shared libraries"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/lib*.so.* "$subpkgdir"/usr/lib/
+}
+
+py() {
+	pkgdesc="Python bindings to libunbound"
+	mkdir -p "$subpkgdir"/usr/lib/
+	mv "$pkgdir"/usr/lib/python* "$subpkgdir"/usr/lib/
+}
+
+migrate() {
+	pkgdesc="Simple tool to migrate from dnscache to unbound"
+	mkdir -p "$subpkgdir"/usr/bin/
+	install -m755 "$srcdir"/migrate-dnscache-to-unbound \
+		"$subpkgdir"/usr/bin/
+}
+
+sha512sums="910fd0956b8828d3db0511a85bf6ab6c4c3982f17c70ccb7123d1de1650d24c2906bc29ac4ea83fd7d95d8af29e2cbc88df666f365e51296f552292ef9753016  unbound-1.6.6.tar.gz
+90faa8bf352132b63f6b33cd7d7cac164df331272568e7a442d92e021fcf727334f6e28c11ed211bcd3eb62aa606c110e4931b514fecf388d0fbea3810b7530a  conf.patch
+b16b7b15392c0d560718ee543f1eebc5617085fb30d61cddc20dd948bd8b1634ee5b2de1c9cb172a6c0d1c5bbaf98b6fd39816d39c72a43ff619455449e668ac  update-unbound-root-hints
+b26a13c1c88da9611a65705dc59f7233c5e0f6aced0d7d66c18536a969a2de627ca5d4bb55eedd81f2f040fa11bde48eaaeca2850f376e72e7a531678a259131  migrate-dnscache-to-unbound
+0dca3470ed4ca9b76d6f47f5d20e92924e6648f0870d8594fe6735d8f1cdfeeee7296301066c2a8b2b94f7daed86c15efe00c301ca27e435e5dd2c85508dc9c8  root.hints
+540e7a11fa5421e2d103c42d69faf1ba005adcadfac2f65091795a2f00e5b5acd1436b4d2adfe2bb0fdfcbfb44d0967d6bce87620c618549fcd7e32019040f29  unbound.initd"

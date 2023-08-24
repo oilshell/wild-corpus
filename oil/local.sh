@@ -1,0 +1,1 @@
+/home/andy/git/oilshell/oil-sketch/local.sh

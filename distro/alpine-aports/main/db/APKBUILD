@@ -1,0 +1,73 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=db
+pkgver=5.3.28
+_ver=${pkgver}
+pkgrel=0
+pkgdesc="The Berkeley DB embedded database system"
+url="http://www.oracle.com/technology/software/products/berkeley-db/index.html"
+arch="all"
+license="custom"
+options="!check"  # "check target not available"
+depends=
+makedepends=
+subpackages="$pkgname-dev $pkgname-doc $pkgname-utils $pkgname-c++:cxx"
+# Patches were found here:
+# http://www.oracle.com/technology/products/berkeley-db/db/update/4.7.25/patch.4.7.25.html
+source="http://download.oracle.com/berkeley-db/db-$pkgver.tar.gz
+	"
+
+_builddir="$srcdir/db-$_ver"
+prepare() {
+	cd "$_builddir"
+	update_config_sub || return 1
+}
+
+build () {
+	cd "$_builddir"
+	for i in ../patch.*; do
+		[ -r "$i" ] || continue
+		msg "Applying $i..."
+		patch -p0 < $i || return 1
+	done
+
+	cd build_unix
+	../dist/configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--enable-compat185 \
+		--enable-shared \
+		--enable-cxx \
+		--disable-static \
+		|| return 1
+	make LIBSO_LIBS=-lpthread || return 1
+}
+
+package() {
+	cd "$srcdir"/db-$_ver/build_unix
+	make DESTDIR="$pkgdir" install || return 1
+
+	mkdir -p "$pkgdir"/usr/share/doc
+	mv "$pkgdir"/usr/docs "$pkgdir"/usr/share/doc/$pkgname
+
+	install -D -m644 "$srcdir"/db-$_ver/LICENSE \
+		"$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+utils() {
+	pkgdesc="Utils for The Berkeley DB embedded database system"
+	replaces="db"
+	mkdir -p "$subpkgdir"/usr/
+	mv "$pkgdir"/usr/bin "$subpkgdir"/usr/
+}
+
+cxx() {
+	pkgdesc="C++ binding for libdb"
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/libdb_cxx*.so "$subpkgdir"/usr/lib/
+}
+
+md5sums="b99454564d5b4479750567031d66fe24  db-5.3.28.tar.gz"
+sha256sums="e0a992d740709892e81f9d93f06daf305cf73fb81b545afe72478043172c3628  db-5.3.28.tar.gz"
+sha512sums="e91bbe550fc147a8be7e69ade86fdb7066453814971b2b0223f7d17712bd029a8eff5b2b6b238042ff6ec1ffa6879d44cb95c5645a922fee305c26c3eeaee090  db-5.3.28.tar.gz"

@@ -1,0 +1,38 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          qemu-system-x86
+# Required-Start:    mountkernfs
+# Required-Stop:     
+# Should-Start:      udev devfsd
+# Should-Stop:       
+# Default-Start:     S
+# Default-Stop:      
+# Short-Description: QEMU KVM module loading script
+# Description:       This script loads the kernel modules needed by QEMU KVM
+### END INIT INFO
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+. /lib/lsb/init-functions
+
+test -x /usr/share/qemu/init/qemu-kvm-init || exit 5
+
+start() {
+    log_daemon_msg "Configuring kvm" "qemu-kvm"
+    /usr/share/qemu/init/qemu-kvm-init start
+    log_end_msg $?
+}
+
+case "$1" in
+  start|restart|force-reload)
+    start
+    ;;
+  stop)
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|force-reload}" >&2
+    exit 3
+    ;;
+esac
+
+:

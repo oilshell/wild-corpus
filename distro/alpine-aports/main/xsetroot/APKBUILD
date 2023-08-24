@@ -1,0 +1,46 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=xsetroot
+pkgver=1.1.1
+pkgrel=1
+pkgdesc="X.Org xsetroot application"
+url="http://xorg.freedesktop.org/"
+arch="all"
+license="MIT"
+subpackages="$pkgname-doc"
+depends=""
+makedepends="libx11-dev libxmu-dev libxcursor-dev xbitmaps util-macros"
+source="http://www.x.org/releases/individual/app/$pkgname-$pkgver.tar.bz2"
+
+builddir="$srcdir/$pkgname-$pkgver"
+prepare() {
+	cd "$builddir"
+	chmod a+w config.sub
+	update_config_sub
+	default_prepare
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+md5sums="7211b31ec70631829ebae9460999aa0b  xsetroot-1.1.1.tar.bz2"
+sha256sums="ba215daaa78c415fce11b9e58c365d03bb602eaa5ea916578d76861a468cc3d9  xsetroot-1.1.1.tar.bz2"
+sha512sums="04834a8ca658a4aabe03e62588353102e8019d424e25fab450d48e6fc4ac358df5bb98a850c82c61e2495faabfe54f3d92d9563e77c83ace7fd69c278edbbd64  xsetroot-1.1.1.tar.bz2"

@@ -1,0 +1,42 @@
+# Maintainer: Łukasz Jendrysik <scadu@yandex.com>
+pkgname=i3wm-gaps
+pkgver=4.14.1
+pkgrel=0
+pkgdesc="A tiling window manager with gaps and other additional features"
+url="https://github.com/Airblader/i3"
+arch="all"
+license="BSD"
+replaces="i3wm"
+makedepends="bison flex libxcb-dev xcb-util-cursor-dev
+	xcb-util-keysyms-dev xcb-util-wm-dev libev-dev pango-dev cairo-dev
+	yajl-dev startup-notification-dev pcre-dev libxkbcommon-dev
+	xcb-util-xrm-dev asciidoc perl xmlto autoconf automake libtool"
+subpackages="$pkgname-doc"
+source="i3wm-$pkgver.tar.gz::https://github.com/Airblader/i3/archive/$pkgver.tar.gz
+	musl.patch"
+
+builddir="$srcdir/i3-$pkgver"
+
+build() {
+	cd "$srcdir/i3-$pkgver"
+  	autoreconf -fi
+  	./configure --prefix="/usr" --sysconfdir="/etc" --disable-builddir
+  	make
+}
+
+package() {
+  	cd "$builddir"
+  	make DESTDIR="$pkgdir/" install
+
+  	install -d "$pkgdir/usr/share/man/man1"
+  	install -m644 man/*.1 "$pkgdir"/usr/share/man/man1/
+}
+
+check() {
+	cd "$builddir"
+	./i3 --version
+}
+
+
+sha512sums="1f8ce8d886e38ea940d6b134c156d77d1e95367fd82bb750f9797a8a915d295846ecfbd1884a241676fba2e23f507775d9943a640553671ae9deaf87b705acd4  i3wm-4.14.1.tar.gz
+8ce7d00371c43b93dabbe0dadf9caf7c58a68f4a0079f5a9b9552c15c55bfa0df16d7e87a281595af2ac5254632ba28ccf82a467cea16159b41490f6f2910299  musl.patch"

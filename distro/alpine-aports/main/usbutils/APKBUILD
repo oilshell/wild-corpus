@@ -1,0 +1,44 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=usbutils
+pkgver=008
+pkgrel=2
+pkgdesc="USB Device Utilities"
+url="http://linux-usb.sourceforge.net/"
+arch="all"
+license="GPL2+"
+subpackages="$pkgname-doc"
+depends="hwdata-usb"
+makedepends="libusb-dev eudev-dev"
+source="http://www.kernel.org/pub/linux/utils/usb/usbutils/$pkgname-$pkgver.tar.xz
+	usbutils-006-hwdata.patch
+	"
+
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--datadir=/usr/share/hwdata \
+		--disable-usbids \
+		--disable-zlib
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	mkdir -p "$pkgdir"/usr/lib/
+	mv "$pkgdir"/usr/share/pkgconfig \
+		"$pkgdir"/usr/lib/
+}
+
+sha512sums="ab1ad36467ff79ff5ab0b924620001612cae44def58c05ade01a4e58d8a4d48df61c09faba49a20497b7d6314045bbaf137b51a9f4e6b65ed0ea3bb339bf1c45  usbutils-008.tar.xz
+681894f85f4abe1593ca00cfa5be7d57e44d4aa90e69f94f6fc621d265c6d6c492622710f3bed3c75ee5459a634848516ad0ef1e3830075c5a55b8172c53af1e  usbutils-006-hwdata.patch"

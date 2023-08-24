@@ -1,0 +1,41 @@
+# Contributor: <xmingske@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libevhtp
+pkgver=1.2.11n
+pkgrel=3
+pkgdesc="Flexible replacement for libevent's httpd API"
+url="https://github.com/ellzey/libevhtp/"
+arch="all"
+license="BSD"
+makedepends="cmake libevent-dev libressl-dev"
+source="$pkgname-$pkgver.tar.gz::https://github.com/criticalstack/libevhtp/archive/$pkgver.tar.gz"
+subpackages="$pkgname-dev"
+
+builddir="${srcdir}/${pkgname}-${pkgver}"
+
+prepare() {
+	local pf
+	cd "${builddir}"
+	for pf in $source; do
+		case $pf in
+		*.patch) msg $pf; patch -p1 -i "$srcdir"/${pf} || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "${builddir}"
+	cmake -DCUSTOM_BINDIR=/usr/bin \
+                -DCMAKE_INSTALL_PREFIX=/usr \
+                -DCUSTOM_DOCDIR="/usr/share/doc/${pkgname}" \
+                -DCUSTOM_SHAREDIR="/usr/share/${pkgname}" \
+                -DEVHTP_BUILD_SHARED=ON .
+	make || return 1
+}
+
+package() {
+	cd "${builddir}"
+	make DESTDIR="${pkgdir}" install || return 1
+}
+
+sha512sums="cfa84e9b2b29b3c0808edbf50a8d63ad0b4a6f59abebdbf8f34146c288c8ecdc0434370ae77bd611dcc8733456bccc365f1c59fc132a594af9e91c68c3d58ee7  libevhtp-1.2.11n.tar.gz"

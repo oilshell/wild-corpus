@@ -1,0 +1,27 @@
+# Maintainer: Michael Zuo <muh.muhten@gmail.com>
+pkgname=minisign
+pkgver=0.7
+pkgrel=1
+pkgdesc="A dead simple tool to sign files and verify signatures."
+url="https://jedisct1.github.io/minisign"
+arch="all"
+license="ISC"
+options="!check"
+makedepends="cmake libsodium-dev"
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/jedisct1/minisign/archive/$pkgver.tar.gz"
+
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	cmake -DCMAKE_INSTALL_PREFIX=/usr
+	make
+}
+
+package() {
+	cd "$builddir"
+	make install DESTDIR="$pkgdir"
+}
+
+sha512sums="d23bab6d9c37132ccbc70209667e327704d24755d546504dc08c57b07177aeb8317ea8e1c54da5608d6f283cd7624228f9e932134f06a530ecb5eaf91390b7cc  minisign-0.7.tar.gz"

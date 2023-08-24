@@ -1,0 +1,32 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer:
+pkgname=shotcut
+pkgver=17.08
+pkgrel=0
+pkgdesc="a free, open source, cross-platform video editor"
+url="https://www.shotcut.org"
+arch="all"
+license="GPL3"
+depends=""
+makedepends="qt5-qtbase-dev qt5-qtwebkit-dev qt5-qtmultimedia-dev
+	qt5-websockets-dev qt5-x11extras-dev ffmpeg-dev mlt-dev"
+install=""
+subpackages=""
+source="shotcut-$pkgver.tar.gz::https://github.com/mltframework/shotcut/archive/v$pkgver.tar.gz
+	shotcut-melt.patch
+	"
+builddir="$srcdir/shotcut-$pkgver"
+
+build() {
+	cd "$builddir"
+	qmake-qt5 PREFIX="/usr/" || return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make INSTALL_ROOT="$pkgdir" install
+}
+
+sha512sums="09fca0d40bab6b756a2201afad7bb6cd81f25f13604bdd433ee5390856d19b8252b7054c950bca205654f23fcd5dce443e02df5ef5f89b0af054332a6370bf32  shotcut-17.08.tar.gz
+57063ccb11cb9bd061b807934afe5656d9e1e4a31850de2e60b6a0cdf4741c7975a2a548fdb5e7d2bb0a1e44635adb832d139ac55632a4e7f592952b67d17cfe  shotcut-melt.patch"

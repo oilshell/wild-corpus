@@ -1,0 +1,71 @@
+#!/bin/sh
+
+# process independent locking utility
+
+# Author:
+#    http://www.pixelbeat.org/
+# Notes:
+#    There is a C equivalent of this implemented using open(EXCL)
+#    rather than mkdir for illustration, available from the above web site.
+#    There is a lockf util in BSD that supports locks external to commands,
+#    and is not susceptiple to stale locks being left on the filesystem.
+# Changes:
+#    V0.1, 02 Apr 2003, Initial release
+#    V0.2, 23 Feb 2006, Add trap so signals don't mess up atomic operations
+#    V0.3, 06 Jan 2010, Use shell arithmetic and faster polling
+#    V0.4, 08 Jul 2010, Don't hang if can't create $workdir
+
+trap "" HUP INT QUIT ABRT #try to be atomic
+
+POLL_FREQ=10 #Hz Must be 1,10,100,...
+DELAY=$(echo $POLL_FREQ | sed 's/1\(.*\)0/.\11/')
+
+# $workdir must be writeable or be creatable
+[ "$workdir" ] || workdir=/var/run/sematree
+
+usage() {
+    echo "\
+Usage: $(basename $0) {acquire,release,inc,dec} lock_name [seconds to wait]\
+" >&2
+    exit 1
+}
+
+[ $# -lt 2 ] && usage
+action=$1
+name=$2
+if [ $# -ge 3 ]; then
+    count=$(($3 * $POLL_FREQ))
+else
+    count=-1 #forever
+fi
+
+if [ ! -d $workdir ]; then
+    #race here handled by -p
+    mkdir -p $workdir
+fi
+[ -d $workdir ] || exit 1
+lockname=$workdir/$name
+semaname=$workdir/$name.sem
+
+case $action in
+acquire)
+    until mkdir $lockname 2>/dev/null; do
+        [ $count -eq 0 ] && exit 1
+        [ ! $count -eq "-1" ] && count=$(($count - 1))
+        sleep $DELAY
+    done ;;
+inc|dec)
+    if [ ! -d $lockname ]; then
+        echo "can't increment or decrement without acquiring first" >&2
+        exit 1
+    fi
+    [ -f $semaname ] && cur_val=$(cat $semaname) || cur_val=0
+    [ $action = inc ] && op=+ || op=-
+    cur_val=$(($cur_val $op 1))
+    [ $cur_val -eq 0 ] && rm $semaname || echo $cur_val > $semaname
+    echo $cur_val ;;
+release)
+    [ ! -d $lockname ] && exit 1 || rmdir $lockname ;;
+*)
+    usage ;;
+esac

@@ -1,0 +1,68 @@
+# Contributor: Sergei Lukin <sergej.lukin@gmail.com>
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Contributor: Sören Tempel <soeren+alpine@soeren-tempel.net>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=vim
+pkgver=8.0.1171
+pkgrel=0
+pkgdesc="advanced text editor"
+url="http://www.vim.org"
+arch="all"
+license="custom"
+depends=""
+makedepends="ncurses-dev lua5.2-dev python3-dev"
+subpackages="$pkgname-doc ${pkgname}diff::noarch"
+source="$pkgname-$pkgver.tar.gz::https://github.com/$pkgname/$pkgname/archive/v$pkgver.tar.gz
+	vimrc
+	"
+builddir="$srcdir/$pkgname-$pkgver"
+
+# secfixes:
+#   8.0.0329-r0:
+#     - CVE-2017-5953
+#   8.0.0056-r0:
+#     - CVE-2016-1248
+
+prepare() {
+	cd "$builddir"
+	# Read vimrc from /etc/vim
+	echo '#define SYS_VIMRC_FILE "/etc/vim/vimrc"' >> src/feature.h
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--enable-luainterp \
+		--enable-python3interp=dynamic \
+		--without-x \
+		--disable-nls \
+		--enable-multibyte \
+		--enable-gui=no \
+		--with-lua-prefix=/usr/lua5.2 \
+		--with-compiledby="Alpine Linux" \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make -j1 DESTDIR="$pkgdir/" install
+
+	install -Dm644 runtime/doc/uganda.txt \
+		"$pkgdir/usr/share/licenses/$pkgname/LICENSE" || return 1
+	install -Dm644 "$srcdir"/vimrc "$pkgdir"/etc/vim/vimrc || return 1
+}
+
+vimdiff() {
+	pkgdesc="view file diffs in vim"
+	depends="diffutils"
+
+	install -d "$subpkgdir"/usr/bin || return 1
+	mv "$pkgdir"/usr/bin/vimdiff "$subpkgdir"/usr/bin
+}
+
+sha512sums="b192b8da3aad1f4203495e11d0fd89d41aa2b2bb4c3667c6885afd6e2b95f4d44a047b7481bb83837e28a61da2a97eb3cd6add13f29e8e7db96bda628a3da185  vim-8.0.1171.tar.gz
+d9586b777881973cb5e48e18750336a522ed72c3127b2d6b6991e2b943468ca5b694476e7fa39ab469178c1375fc8f52627484e0fe377aea5811a513e35a7b02  vimrc"

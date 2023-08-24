@@ -1,0 +1,2243 @@
+#!/bin/bash
+{
+	#////////////////////////////////////
+	# DietPi Function:
+	# - Enables control and applies settings for specific hardware.
+	#
+	#////////////////////////////////////
+	# Created by Daniel Knight / daniel.knight@dietpi.com / dietpi.com
+	#
+	#////////////////////////////////////
+	#
+	# Usage:
+	FP_SCRIPT='/DietPi/dietpi/func/dietpi-set_hardware'
+	AVAIABLE_COMMANDS="
+Available commands
+$FP_SCRIPT 		rpi3_usb_boot		enable
+$FP_SCRIPT 		rpi-camera			enable/disable
+$FP_SCRIPT 		gpumemsplit			64/128/256 #RPi only
+$FP_SCRIPT 		remoteir			odroid_remote/justboom_ir_remote
+$FP_SCRIPT 		kernel				??see sourcode
+$FP_SCRIPT 		eth-forcespeed		10/100/1000/disable
+$FP_SCRIPT 		rpi-opengl			enable/disable
+$FP_SCRIPT 		i2c					enable/disable/khz
+$FP_SCRIPT 		wificountrycode		code
+$FP_SCRIPT 		wifimodules			enable/disable/onboard_enable/onboard_disable
+$FP_SCRIPT 		wificreds			set | Generates wpa_supplicant.conf from dietpi.txt globals
+$FP_SCRIPT 		preferipversion		auto/ipv4/ipv6
+$FP_SCRIPT 		bluetooth 			enable/disable
+$FP_SCRIPT 		serialconsole		enable/disable
+$FP_SCRIPT 		soundcard 			target_card (non-matching name for reset to default) add '-eq' to target_card string, enable alsa eq on card. HW:x,x (specify target card and device index eg: HW:9,1)
+$FP_SCRIPT 		lcdpanel 			target_panel (none to remove all)
+"
+	#////////////////////////////////////
+
+	#Grab Inputs
+	INPUT_DEVICE_NAME=$(echo -e "$1" | tr '[:upper:]' '[:lower:]')
+	INPUT_DEVICE_VALUE=$(echo -e "$2" | tr '[:upper:]' '[:lower:]')
+	# - support for 0/1 inputs for enable/disable
+	if [ "$INPUT_DEVICE_VALUE" = "1" ]; then
+
+		INPUT_DEVICE_VALUE='enable'
+
+	elif [ "$INPUT_DEVICE_VALUE" = "0" ]; then
+
+		INPUT_DEVICE_VALUE='disable'
+
+	fi
+
+	#Import DietPi-Globals ---------------------------------------------------------------
+	. /DietPi/dietpi/func/dietpi-globals
+	G_CHECK_ROOT_USER
+	G_CHECK_ROOTFS_RW
+	export G_PROGRAM_NAME='DietPi-Set_Hardware'
+	#Import DietPi-Globals ---------------------------------------------------------------
+
+	#Semi support non-dietpi Raspbian
+	FP_RPI_CONFIG='/DietPi/config.txt'
+	if [ ! -f "$FP_RPI_CONFIG" ]; then
+
+		FP_RPI_CONFIG='/boot/config.txt'
+
+	fi
+
+	EXIT_CODE=0
+
+	HW_ONBOARD_WIFI=$(sed -n 10p /DietPi/dietpi/.hw_model)
+
+	Unknown_Input_Name(){
+
+		EXIT_CODE=1
+		G_DIETPI-NOTIFY 2 "Unknown input name ($INPUT_DEVICE_NAME). Nothing has been applied."
+
+		echo -e "$AVAIABLE_COMMANDS"
+
+	}
+
+	Unknown_Input_Mode(){
+
+		EXIT_CODE=1
+		G_DIETPI-NOTIFY 2 "Unknown input value ($INPUT_DEVICE_VALUE). Nothing has been applied."
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#rpi-camera
+	#/////////////////////////////////////////////////////////////////////////////////////
+	RPi_Camera_Main(){
+
+		# - int, assume RPi
+		if [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
+
+			# - Enable RPi Camera module
+			sed -i '/start_x=/c\start_x=1' "$FP_RPI_CONFIG"
+
+			# - requires 128MB memory split min.
+			if (( $(cat "$FP_RPI_CONFIG" | grep -m1 'gpu_mem_' | sed 's/.*=//g') < 128 )); then
+
+				/DietPi/dietpi/func/dietpi-set_hardware gpumemsplit 128
+
+			fi
+
+			# - v4l2 module (motioneye /dev/video0)
+			if (( ! $(cat /etc/modules | grep -ci -m1 '^bcm2835-v4l2') )); then
+
+				echo -e "bcm2835-v4l2" >> /etc/modules
+
+			fi
+
+		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
+
+			sed -i '/start_x=/c\start_x=0' "$FP_RPI_CONFIG"
+			sed -i '/bcm2835-v4l2/d' /etc/modules
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#rpi3_usb_boot
+	#/////////////////////////////////////////////////////////////////////////////////////
+	RPi_USB_Boot_Main(){
+
+		if [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
+
+			sed -i '/program_usb_boot_mode=/d' "$FP_RPI_CONFIG"
+			cat << _EOF_ >> "$FP_RPI_CONFIG"
+program_usb_boot_mode=1
+_EOF_
+
+			cat << _EOF_ > /etc/systemd/system/dietpi-rm_program_usb_boot_mode.service
+[Unit]
+Description=dietpi-rm_program_usb_boot_mode.service
+After=dietpi-boot.service
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStartPre=$(which sed) -i '/program_usb_boot_mode=/d' $FP_RPI_CONFIG
+ExecStartPre=$(which systemctl) disable dietpi-rm_program_usb_boot_mode.service
+ExecStart=$(which systemctl) daemon-reload
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+systemctl daemon-reload
+systemctl enable dietpi-rm_program_usb_boot_mode.service
+
+		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
+
+			sed -i '/program_usb_boot_mode=/d' "$FP_RPI_CONFIG"
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#gpumemsplit
+	#/////////////////////////////////////////////////////////////////////////////////////
+	Gpu_Memory_Split_Main(){
+
+		# - int, assume RPi
+		if [[ $INPUT_DEVICE_VALUE =~ ^-?[0-9]+$ ]]; then
+
+			sed -i "/gpu_mem_256=/c\gpu_mem_256=$INPUT_DEVICE_VALUE" "$FP_RPI_CONFIG"
+			sed -i "/gpu_mem_512=/c\gpu_mem_512=$INPUT_DEVICE_VALUE" "$FP_RPI_CONFIG"
+			sed -i "/gpu_mem_1024=/c\gpu_mem_1024=$INPUT_DEVICE_VALUE" "$FP_RPI_CONFIG"
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#remoteir
+	#/////////////////////////////////////////////////////////////////////////////////////
+	RemoteIR_Prereqs(){
+
+		# - LIRC
+		if (( ! $(dpkg --get-selections | grep -ci -m1 '^lirc') )); then
+
+			G_AGI lirc
+			if (( $? != 0 )); then
+
+				G_DIETPI-NOTIFY 1 "apt-get install lirc"
+				EXIT_CODE=1
+
+			fi
+
+		fi
+
+	}
+
+	RemoteIR_Reset_All(){
+
+		# - Disable odroids
+		systemctl stop odroid-remote
+		systemctl disable odroid-remote
+		rm /etc/systemd/system/odroid-remote.service
+
+		# - Disable JustBoom
+		systemctl stop justboom-ir-mpd.service
+		systemctl disable justboom-ir-mpd.service
+		rm /etc/systemd/system/justboom-ir-mpd.service
+
+		sed -i '/dtoverlay=lirc-rpi/d' "$FP_RPI_CONFIG"
+		sed -i '/dtparam=gpio_in_pin=25/d' "$FP_RPI_CONFIG"
+
+	}
+
+	RemoteIR_Main(){
+
+		if [ "$INPUT_DEVICE_VALUE" = "odroid_remote" ]; then
+
+			RemoteIR_Prereqs
+			RemoteIR_Reset_All &> /dev/null
+
+			# - xu4 Cloudshell
+			if (( $G_HW_MODEL == 11 )); then
+
+				# - modules
+				local string="options gpioplug_ir_recv gpio_nr=24 active_low=1"
+				if (( ! $(cat /etc/modprobe.d/odroid-cloudshell.conf | grep -ci -m1 "^$string") )); then
+
+					echo "$string" >> /etc/modprobe.d/odroid-cloudshell.conf
+
+				fi
+
+				string="gpio-ir-recv"
+				if (( ! $(cat /etc/modules | grep -ci -m1 "^$string") )); then
+
+					echo "$string" >> /etc/modules
+
+				fi
+
+				string="gpioplug-ir-recv"
+				if (( ! $(cat /etc/modules | grep -ci -m1 "^$string") )); then
+
+					echo "$string" >> /etc/modules
+
+				fi
+
+			# - c1/c2
+			elif (( $G_HW_MODEL == 10 || $G_HW_MODEL == 12 )); then
+
+				# - Module
+				if (( ! $(cat /etc/modules | grep -ci -m1 '^meson_ir') )); then
+
+					echo -e "meson_ir" >> /etc/modules
+
+				fi
+
+			fi
+
+			# - All
+			# - SystemD
+			systemctl disable lirc
+			rm /etc/init.d/lirc
+			cat << _EOF_ > /etc/systemd/system/odroid-remote.service
+[Unit]
+Description=Odroid Remote C1/C2/XU4
+
+[Service]
+Type=forking
+ExecStartPre=/bin/bash -c 'mkdir -p /var/run/lirc'
+ExecStart=/usr/sbin/lircd --output=/run/lirc/lircd --driver=default --device=/dev/lirc0 --uinput
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+			systemctl daemon-reload
+			systemctl enable odroid-remote.service
+
+			#	Lircd conf for Odroid Remote
+			cat << _EOF_ > /etc/lirc/lircd.conf
+begin remote
+
+  name lircd.conf
+  bits 16
+  flags SPACE_ENC|CONST_LENGTH
+  eps 30
+  aeps 100
+
+  header 9000 4500
+  one 563 1688
+  zero 563 564
+  ptrail 563
+  pre_data_bits 16
+  pre_data 0x4DB2
+  repeat 9000 2250
+  toggle_bit_mask 0x0
+      begin codes
+
+          KEY_LEFT 0x9966
+          KEY_RIGHT 0x837C
+          KEY_UP 0x53AC
+          KEY_DOWN 0x4BB4
+          KEY_ENTER 0x738C
+          KEY_HOME 0x41BE
+          KEY_MUTE 0x11EE
+          KEY_MENU 0xA35C
+          KEY_BACK 0x59A6
+          KEY_VOLUMEDOWN 0x817E
+          KEY_VOLUMEUP 0x01FE
+          KEY_POWER 0x3BC4
+
+      end codes
+
+end remote
+_EOF_
+
+		elif [ "$INPUT_DEVICE_VALUE" = "justboom_ir_remote" ]; then
+
+			RemoteIR_Prereqs
+			RemoteIR_Reset_All &> /dev/null
+
+			cat << _EOF_ >> "$FP_RPI_CONFIG"
+dtoverlay=lirc-rpi
+dtparam=gpio_in_pin=25
+_EOF_
+
+			cat << _EOF_ > /etc/lirc/hardware.conf
+LIRCD_ARGS="--uinput"
+LOAD_MODULES=true
+DRIVER="default"
+DEVICE="/dev/lirc0"
+MODULES="lirc_rpi"
+LIRCD_CONF=""
+LIRCMD_CONF=""
+_EOF_
+
+				cat << _EOF_ > /etc/lirc/lircd.conf
+begin remote
+
+  name  lircd.conf
+  bits            5
+  flags RC5|CONST_LENGTH
+  eps            30
+  aeps          100
+
+  one           921   855
+  zero          921   855
+  plead         936
+  pre_data_bits   8
+  pre_data       0xA0
+  gap          114211
+  toggle_bit_mask 0x800
+
+  suppress_repeat 5
+  duty_cycle 300
+
+  begin codes
+
+        KEY_HOME 0x10
+        KEY_POWER 0x11
+        KEY_MUTE 0x12
+        KEY_LEFT 0x13
+        KEY_RIGHT 0x14
+        KEY_ENTER 0x15
+        KEY_MENU 0x16
+        KEY_BACK 0x17
+        KEY_VOLUMEDOWN 0x18
+        KEY_VOLUMEUP 0x19
+        KEY_UP 0x1A
+        KEY_DOWN 0x1B
+
+      end codes
+
+end remote
+_EOF_
+
+			# + MPD control
+			if (( ! $(dpkg --get-selections | grep -ci -m1 '^mpc[[:space:]]') )); then
+
+				G_AGI mpc
+
+			fi
+
+			cat << _EOF_ > ~/.lircrc
+begin
+prog = irexec
+button = KEY_ENTER
+config = mpc toggle
+end
+begin
+prog = irexec
+button = KEY_VOLUMEUP
+config = mpc volume +2
+end
+begin
+prog = irexec
+button = KEY_VOLUMEDOWN
+config = mpc volume -2
+end
+begin
+prog = irexec
+button = KEY_RIGHT
+config = mpc next
+end
+begin
+prog = irexec
+button = KEY_LEFT
+config = mpc prev
+end
+begin
+prog = irexec
+button = KEY_UP
+config = mpc seek +00:00:10
+end
+begin
+prog = irexec
+button = KEY_DOWN
+config = mpc seek -00:00:10
+end
+begin
+prog = irexec
+button = KEY_BACK
+config = mpc repeat on
+end
+begin
+prog = irexec
+button = KEY_MENU
+config = mpc repeat off
+end
+_EOF_
+
+			#	service
+			cat << _EOF_ > /etc/systemd/system/justboom-ir-mpd.service
+[Unit]
+Description=justboom-ir-mpd
+After=sound.target lirc.service
+
+[Service]
+User=$USER
+Type=simple
+
+ExecStart=/usr/bin/irexec
+
+[Install]
+WantedBy=default.target
+_EOF_
+			systemctl enable justboom-ir-mpd.service
+			systemctl daemon-reload
+			systemctl start justboom-ir-mpd.service
+
+		elif [ "$INPUT_DEVICE_VALUE" = "none" ]; then
+
+			RemoteIR_Reset_All &> /dev/null
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#Ethernet force link speed
+	#/////////////////////////////////////////////////////////////////////////////////////
+	Eth_Force_Speed_Main(){
+
+		if (( $INPUT_DEVICE_VALUE > 0 )); then
+
+			local eth_force_speed=$INPUT_DEVICE_VALUE
+			local eth_adapter="eth$(sed -n 1p /DietPi/dietpi/.network)"
+
+			cat << _EOF_ > /etc/systemd/system/ethtool_force_speed.service
+[Unit]
+Description=ethtool force speed
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ethtool -s $eth_adapter speed $eth_force_speed duplex full autoneg off
+
+[Install]
+WantedBy=ifup@$eth_adapter.service
+_EOF_
+			systemctl enable ethtool_force_speed.service
+			systemctl start ethtool_force_speed.service
+
+		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then #0 is converted to 'disabled'
+
+			rm /etc/systemd/system/ethtool_force_speed.service &> /dev/null
+			systemctl daemon-reload
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#RPi openGL
+	#/////////////////////////////////////////////////////////////////////////////////////
+	RPi_OpenGL_Main(){
+
+		if [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
+
+			#RPi 2/3+ only
+			if (( $G_HW_MODEL >= 2 && $G_HW_MODEL < 10 )); then
+
+				#install pre-reqs
+
+				# - Install Xserver
+				/DietPi/dietpi/dietpi-software install 6
+
+				# - GL packages
+				G_DIETPI-NOTIFY 2 "Installing additional OpenGL packages, please wait...\n"
+				sleep 1
+				G_AGI libgl1-mesa-dri mesa-utils
+
+				sed -i '/dtoverlay=vc4-kms-v3d/d' "$FP_RPI_CONFIG"
+				echo -e "\ndtoverlay=vc4-kms-v3d" >> "$FP_RPI_CONFIG"
+
+			else
+
+				G_DIETPI-NOTIFY 1 "OpenGL requires a RPi 2 or higher"
+				sleep 2
+
+			fi
+
+		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
+
+			sed -i '/dtoverlay=vc4-kms-v3d/d' "$FP_RPI_CONFIG"
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# lcdpanel eg: All non-HDMI/VGA based displays and monitors.
+	#/////////////////////////////////////////////////////////////////////////////////////
+	Lcd_Panel_Not_Available_For_Device(){
+
+		EXIT_CODE=1
+		G_DIETPI-NOTIFY 2 "$INPUT_DEVICE_VALUE is not available for this device. Nothing has been applied."
+
+	}
+
+	Lcd_Panel_Main(){
+
+		local update_dietpitxt=1
+
+		if [ "$INPUT_DEVICE_VALUE" = "odroid-lcd35" ]; then
+
+			Lcd_Panel_OdroidLCD35_Enable
+
+		elif [ "$INPUT_DEVICE_VALUE" = "waveshare32" ]; then
+
+			Lcd_Panel_Waveshare32_Enable
+
+		elif [ "$INPUT_DEVICE_VALUE" = "odroid-cloudshell" ]; then
+
+			Lcd_Panel_Odroidcloudshell_Enable
+
+		#disable all
+		elif [ "$INPUT_DEVICE_VALUE" = "none" ]; then
+
+			Lcd_Panel_Waveshare32_Disable
+			Lcd_Panel_Odroidcloudshell_Disable
+			Lcd_Panel_OdroidLCD35_Disable
+
+		else
+
+			update_dietpitxt=0
+			Unknown_Input_Mode
+
+		fi
+
+		#Update dietpi.txt entry?
+		if (( $update_dietpitxt )); then
+
+			sed -i "/^CONFIG_LCDPANEL=/c\CONFIG_LCDPANEL=$INPUT_DEVICE_VALUE" /DietPi/dietpi.txt
+
+		fi
+
+	}
+
+	Lcd_Panel_Xorg_All_Enable(){
+
+		#Xinput calibrator
+		G_AGI xinput-calibrator
+
+		mkdir -p /etc/X11/xorg.conf.d
+
+		# - Create desktop icon for xcalibration
+		mkdir -p "$HOME"/Desktop
+		cat << _EOF_ > "$HOME"/Desktop/xinput_calibrator.desktop
+[Desktop Entry]
+Version=1.0
+Name=xinput_calibrator
+Type=Application
+Comment=xinput_calibrator
+Terminal=true
+Exec=xinput_calibrator
+#Icon=/DietPi/dietpi/conf/desktop/dietpi-icon.png
+Categories=System;
+GenericName=xinput_calibrator
+_EOF_
+
+	}
+
+	# - Waveshare32
+	Lcd_Panel_Waveshare32_Enable_X11(){
+
+		cat << _EOF_ > /etc/X11/xorg.conf.d/99-waveshare32_xorg.conf
+Section "Device"
+        Identifier      "Allwinner A10/A13 FBDEV"
+        Driver          "fbturbo"
+        Option          "fbdev" "/dev/fb1"
+
+        Option          "SwapbuffersWait" "true"
+EndSection
+_EOF_
+
+		cat << _EOF_ > /etc/X11/xorg.conf.d/99-waveshare32_calibration.conf
+Section "InputClass"
+        Identifier      "calibration"
+        MatchProduct    "ADS7846 Touchscreen"
+        Option  "Calibration"   "219 3835 3984 219"
+        Option  "SwapAxes"      "1"
+EndSection
+_EOF_
+
+	}
+
+	Lcd_Panel_Waveshare32_Enable(){
+
+		#Disable 1st to reset any existing installations:
+		Lcd_Panel_Waveshare32_Disable
+
+		#RPi
+		if (( $G_HW_MODEL < 10 )); then
+
+			# + X11
+			Lcd_Panel_Xorg_All_Enable
+			Lcd_Panel_Waveshare32_Enable_X11
+
+			wget http://dietpi.com/downloads/conf/waveshare32b-overlay.dtb -O /boot/overlays/waveshare32b.dtbo
+
+			#consoleblank=0 no effect
+			sed -i 's/rootwait/rootwait fbcon=map:10 fbcon=font:ProFont6x11 logo.nologo/' /boot/cmdline.txt
+
+			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" "$FP_RPI_CONFIG"
+			sed -i "/dtparam=spi=/c\dtparam=spi=on" "$FP_RPI_CONFIG"
+
+
+			cat << _EOF_ >> "$FP_RPI_CONFIG"
+
+#Waveshare 32 LCD
+dtoverlay=waveshare32b:rotate=270
+#dtoverlay=ads7846,cs=1,penirq=17,penirq_pull=2,speed=1000000,keep_vref_on=1,swapxy=0,pmax=255,xohms=60,xmin=200,xmax=3900,ymin=200,ymax=3900
+#dtoverlay=w1-gpio-pullup,gpiopin=4,extpullup=1
+_EOF_
+
+			# - Swap input axis
+			sed -i '/"SwapAxes"/c\        Option  "SwapAxes"      "1"' /etc/X11/xorg.conf.d/99-waveshare32_calibration.conf
+
+			# - Move fb0 xorg.conf out the way: https://github.com/Fourdee/DietPi/issues/767
+			mv /usr/share/X11/xorg.conf.d/99-fbturbo.conf /usr/share/X11/99-fbturbo.conf
+
+		#Odroids
+		elif (( $G_HW_MODEL >= 10 && $G_HW_MODEL < 20 )); then
+
+			# + X11
+			Lcd_Panel_Xorg_All_Enable
+			Lcd_Panel_Waveshare32_Enable_X11
+
+			#con2fbmap, maps console (1) to panel(2). Run during boot.
+			cat << _EOF_ > /etc/systemd/system/con2fbmap.service
+[Unit]
+Description=con2fbmap
+
+[Service]
+Type=oneshot
+ExecStart=/bin/con2fbmap 1 2
+ExecStop=/bin/con2fbmap 1 0
+
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+			systemctl enable con2fbmap.service
+			systemctl daemon-reload
+
+			echo -e "spicc" >> /etc/modules
+			echo -e "fbtft_device" >> /etc/modules
+
+			cat << _EOF_ > /etc/modprobe.d/waveshare32.conf
+options fbtft_device name=odroidc_tft32 rotate=270 gpios=reset:116,dc:115 speed=32000000 cs=0
+_EOF_
+
+			#x11
+			cat << _EOF_ > /etc/X11/xorg.conf.d/99-waveshare32_xorg.conf
+Section "Device"
+	Identifier      "FBDEV"
+	Driver          "fbdev"
+	Option          "fbdev" "/dev/fb2"
+
+	#Option          "SwapbuffersWait" "true"
+EndSection
+
+_EOF_
+
+		else
+
+			Lcd_Panel_Not_Available_For_Device
+
+		fi
+
+
+	}
+
+	Lcd_Panel_Waveshare32_Disable(){
+
+		#all
+		rm /etc/X11/xorg.conf.d/99-waveshare32_calibration.conf
+		rm /etc/X11/xorg.conf.d/99-waveshare32_xorg.conf
+		rm /usr/share/applications/xinput_calibrator.desktop
+
+		#RPi
+		if (( $G_HW_MODEL < 10 )); then
+
+			rm /boot/overlays/waveshare32b.dtbo
+			sed -i 's/ fbcon=map:10 fbcon=font:ProFont6x11 logo.nologo//' /boot/cmdline.txt
+
+			sed -i '/Waveshare 32 LCD/d' "$FP_RPI_CONFIG"
+			sed -i '/dtoverlay=waveshare32b/d' "$FP_RPI_CONFIG"
+			sed -i '/dtoverlay=ads7846,cs=1,penirq=17/d' "$FP_RPI_CONFIG"
+			sed -i '/dtoverlay=w1-gpio-pullup,gpiopin=4,extpullup=1/d' "$FP_RPI_CONFIG"
+
+			# - Leave these enabled, just incase the user has other hardware that may use them.
+			#sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" "$FP_RPI_CONFIG"
+			#sed -i "/dtparam=spi=/c\dtparam=spi=on" "$FP_RPI_CONFIG"
+
+			# - Move fb0 xorg.conf back: https://github.com/Fourdee/DietPi/issues/767
+			mv /usr/share/X11/99-fbturbo.conf /usr/share/X11/xorg.conf.d/99-fbturbo.conf
+
+		#Odroids
+		elif (( $G_HW_MODEL >= 10 && $G_HW_MODEL < 20 )); then
+
+			rm /etc/systemd/system/con2fbmap.service
+			systemctl daemon-reload
+
+			rm /etc/modprobe.d/waveshare32.conf
+			sed -i '/^spicc/d' /etc/modules
+			sed -i '/^fbtft_device/d' /etc/modules
+
+		fi
+
+	}
+
+	# - Odroid Cloudshell
+	Lcd_Panel_Odroidcloudshell_Enable(){
+
+		cat << _EOF_ > /etc/modprobe.d/odroid-cloudshell.conf
+options fbtft_device name=hktft9340 busnum=1 rotate=270
+_EOF_
+
+		echo -e "spi_s3c64xx" >> /etc/modules
+		echo -e "fbtft_device" >> /etc/modules
+		echo -e "fbtft_device" >> /etc/modules #XU4 4.9 workaround: https://github.com/Fourdee/DietPi/issues/926#issuecomment-299480918
+
+	}
+
+	Lcd_Panel_Odroidcloudshell_Disable(){
+
+		rm /etc/modprobe.d/odroid-cloudshell.conf
+		sed -i '/^spi_s3c64xx/d' /etc/modules
+		sed -i '/^fbtft_device/d' /etc/modules
+
+		##Cant run it on the fly, locks up device.
+		#root@DietPi-XU4:~# modprobe -rf spi_s3c64xx
+		#root@DietPi-XU4:~# modprobe -rf fbtft_device
+		#Segmentation fault
+
+	}
+
+	# - Odroid LCD 3.5
+	Lcd_Panel_OdroidLCD35_Enable(){
+
+		if (( $G_HW_MODEL >= 10 && $G_HW_MODEL < 20 )); then
+
+			#Reset to disabled:
+			Lcd_Panel_OdroidLCD35_Disable
+
+			Lcd_Panel_Xorg_All_Enable
+
+			cat << _EOF_ > /etc/modprobe.d/odroid-lcd35.conf
+options fbtft_device name=flexpfb rotate=90
+options flexfb chip=ili9488
+_EOF_
+
+			if (( ! $(cat /etc/modules | grep -ci -m1 'flexfb') )); then
+
+				# - XU4
+				if (( $G_HW_MODEL == 11 )); then
+
+					cat << _EOF_ >> /etc/modules
+fbtft_device
+flexfb
+sx865x
+_EOF_
+
+				# - C1/2
+				else
+
+					# - awl_i2c is a shared module and not removed by disabling panel in this script. So lets clear any previous entries 1st to prevent dupes:
+					sed -i '/^aml_i2c/d' /etc/modules
+
+					cat << _EOF_ >> /etc/modules
+aml_i2c
+pwm-meson
+pwm-ctrl
+fbtft_device
+flexfb
+sx865x
+_EOF_
+
+				fi
+
+			fi
+
+			#Service
+			# - XU4
+			if (( $G_HW_MODEL == 11 )); then
+
+				cat << _EOF_ > /etc/systemd/system/odroid-lcd35.service
+[Unit]
+Description=Odroid LCD 3.5
+
+[Path]
+PathExists=/dev/fb2
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/setterm -blank 0 -powersave off
+ExecStart=/bin/con2fbmap 1 2
+StandardOutput=tty
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+			# - C1/2
+			else
+
+				cat << _EOF_ > /etc/systemd/system/odroid-lcd35.service
+[Unit]
+Description=Odroid LCD 3.5
+
+[Path]
+PathExists=/dev/fb2
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'echo 500000 > /sys/devices/platform/pwm-ctrl/freq0'
+ExecStart=/bin/bash -c 'echo 1 > /sys/devices/platform/pwm-ctrl/enable0'
+ExecStart=/bin/bash -c 'echo 1023 > /sys/devices/platform/pwm-ctrl/duty0'
+ExecStart=/usr/bin/setterm -blank 0 -powersave off
+ExecStart=/bin/con2fbmap 1 2
+StandardOutput=tty
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+			fi
+
+			systemctl enable odroid-lcd35.service
+			systemctl daemon-reload
+
+			#XORG
+			rm /etc/X11/xorg.conf.d/exynos.conf #XU4
+
+			mkdir -p /etc/X11/xorg.conf.d
+			cat << _EOF_ > /etc/X11/xorg.conf.d/99-odroid-lcd35.conf
+Section "Device"
+    Identifier    "C fbdev"
+    Driver        "fbdev"
+    Option        "fbdev" "/dev/fb2"
+EndSection
+_EOF_
+
+			# - default calibration
+			cat << _EOF_ > /etc/X11/xorg.conf.d/99-calibration.conf
+Section "InputClass"
+        Identifier      "calibration"
+        MatchProduct    "SX865X Touchscreen"
+        Option  "Calibration"   "3854 155 3880 262"
+        Option  "SwapAxes"      "0"
+EndSection
+_EOF_
+
+		else
+
+			Lcd_Panel_Not_Available_For_Device
+
+		fi
+
+
+	}
+
+	Lcd_Panel_OdroidLCD35_Disable(){
+
+		rm /etc/X11/xorg.conf.d/99-calibration.conf
+		rm /etc/modprobe.d/odroid-lcd35.conf
+		rm /etc/systemd/system/odroid-lcd35.service
+		rm /etc/X11/xorg.conf.d/99-odroid-lcd35.conf
+		systemctl daemon-reload
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# i2c
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Currently only for RPi.
+	I2c_Main(){
+
+		if [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
+
+			#Check/install pre-reqs
+			if (( $(dpkg -l | grep -ci -m1 'i2c-tools') == 0 )); then
+
+				G_DIETPI-NOTIFY 2 "Installing Python-smbus, i2c-tools, pre-reqs.\nPlease wait...\n"
+				sleep 1
+				G_AGI python-smbus i2c-tools
+
+			fi
+
+			#Kernel modules
+			# - Remove all previous line references (includes commented ones)
+			sed -i '/i2c-bcm2708/d' /etc/modules &> /dev/null
+			sed -i '/i2c-dev/d' /etc/modules &> /dev/null
+			# - Add modules
+			echo -e "i2c-bcm2708" >> /etc/modules
+			echo -e "i2c-dev" >> /etc/modules
+
+			#Remove from blacklist (Wheezy only. Jessie doesnt exist)
+			sed -i '/blacklist spi-bcm2708/d' /etc/modprobe.d/raspi-blacklist.conf &> /dev/null
+			sed -i '/blacklist i2c-bcm2708/d' /etc/modprobe.d/raspi-blacklist.conf &> /dev/null
+
+			#config.txt
+			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" "$FP_RPI_CONFIG"
+			sed -i "/dtparam=i2c1=/c\dtparam=i2c1=on" "$FP_RPI_CONFIG"
+
+			#DietPi-Software, set installed
+			sed -i '/^aSOFTWARE_INSTALL_STATE\[72\]=/c\aSOFTWARE_INSTALL_STATE\[72\]=2' /DietPi/dietpi/.installed
+
+		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
+
+			sed -i '/i2c-bcm2708/d' /etc/modules &> /dev/null
+			sed -i '/i2c-dev/d' /etc/modules &> /dev/null
+			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=off" "$FP_RPI_CONFIG"
+			sed -i "/dtparam=i2c1=/c\dtparam=i2c1=off" "$FP_RPI_CONFIG"
+			sed -i "/i2c_arm_baudrate=/c\i2c_arm_baudrate=100000" "$FP_RPI_CONFIG"
+
+		#Set baudrate (khz) | valid int
+		elif [[ $INPUT_DEVICE_VALUE =~ ^-?[0-9]+$ ]] && (( $INPUT_DEVICE_VALUE >= 2 )); then
+
+			sed -i "/i2c_arm_baudrate=/c\i2c_arm_baudrate=$(( $INPUT_DEVICE_VALUE * 1000 ))" "$FP_RPI_CONFIG"
+
+			#inform user
+			INPUT_DEVICE_VALUE+="Khz"
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# bluetooth
+	#/////////////////////////////////////////////////////////////////////////////////////
+
+	Bluetooth_Main(){
+
+		local aBLUETOOTH_MODULES=()
+
+		aBLUETOOTH_MODULES=("bluetooth")
+		aBLUETOOTH_MODULES+=("bnep")
+
+		aBLUETOOTH_MODULES+=("btbcm") # rpi3 broadcom onboard
+
+		aBLUETOOTH_MODULES+=("rfcomm") # BPi pro/m2+ and others
+		aBLUETOOTH_MODULES+=("hidp") # BPi pro/m2+ and others
+
+		aBLUETOOTH_MODULES+=("hci_uart")
+
+		rm /etc/modprobe.d/disable_bt.conf &> /dev/null
+
+		# - Disable
+		if [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
+
+			# + all Broadcom-based models that need brcm_patchram_plus
+			if (( $G_HW_MODEL == 61 || $G_HW_MODEL == 62 )); then
+
+				systemctl stop brcm_patchram_plus 2> /dev/null
+				systemctl disable brcm_patchram_plus 2> /dev/null
+
+			fi
+
+			# + RPi 3 (apply to all, as pi-bluetooth package is default installed on all RPi's now)
+			#	+ Asus TB
+			if (( $G_HW_MODEL < 10 || $G_HW_MODEL == 52 )); then
+
+				systemctl stop hciuart
+				systemctl disable hciuart
+
+			fi
+
+			#bluetooth last
+			systemctl stop bluetooth 2> /dev/null
+			systemctl disable bluetooth 2> /dev/null
+
+			for ((i=$(( ${#aBLUETOOTH_MODULES[@]} - 1 )); i>=0; i--))
+			do
+
+				modprobe -rf "${aBLUETOOTH_MODULES[$i]}" 2> /dev/null
+				echo -e "blacklist ${aBLUETOOTH_MODULES[$i]}" >> /etc/modprobe.d/disable_bt.conf
+
+			done
+
+			#Purge packages
+			if (( $G_DIETPI_INSTALL_STAGE >= 0 )); then
+
+				G_AGP bluetooth bluez-firmware
+				G_AGA
+
+			fi
+
+		# - Enable
+		elif [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
+
+			#Pre-Reqs
+			G_AG_CHECK_INSTALL_PREREQ bluetooth bluez-firmware
+			if (( $G_HW_MODEL < 10 )); then
+
+				G_AG_CHECK_INSTALL_PREREQ pi-bluetooth
+
+			fi
+
+			#bluetooth first
+			for ((i=0; i<${#aBLUETOOTH_MODULES[@]}; i++))
+			do
+
+				modprobe "${aBLUETOOTH_MODULES[$i]}" 2> /dev/null
+
+			done
+
+			# + all Broadcom-based models that need brcm_patchram_plus
+			if (( $G_HW_MODEL == 61 || $G_HW_MODEL == 62 )); then
+
+				systemctl enable brcm_patchram_plus 2> /dev/null
+				G_RUN_CMD systemctl start brcm_patchram_plus
+
+			fi
+
+			systemctl enable bluetooth 2> /dev/null
+			G_RUN_CMD systemctl start bluetooth
+
+			#	+ RPi / Asus TB
+			if (( $G_HW_MODEL < 10 || $G_HW_MODEL == 52 )); then
+
+				systemctl enable hciuart
+				G_RUN_CMD systemctl start hciuart
+
+			fi
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+		unset aBLUETOOTH_MODULES
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Network
+	#/////////////////////////////////////////////////////////////////////////////////////
+
+	Prefer_IPversion(){
+
+		if [ "$INPUT_DEVICE_VALUE" = "ipv4" ]; then
+
+			# - APT force IPv4
+			echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99-dietpi-force-ipv4
+			# - Wget prefer IPv4
+			grep -q '^[[:blank:]]*prefer-family =' /etc/wgetrc &&
+			sed -i '/^[[:blank:]]*prefer-family =/c\prefer-family = IPv4' /etc/wgetrc ||
+			grep -q '^[[:blank:]#;]*prefer-family =' /etc/wgetrc &&
+			sed -i '/^[[:blank:]#;]*prefer-family =/c\prefer-family = IPv4' /etc/wgetrc ||
+			echo 'prefer-family = IPv4' >> /etc/wgetrc
+
+		elif [ "$INPUT_DEVICE_VALUE" = "ipv6" ]; then
+
+			# - APT allow IPv6
+			rm /etc/apt/apt.conf.d/99-dietpi-force-ipv4 &> /dev/null
+			# - Wget prefer IPv6
+			grep -q '^[[:blank:]]*prefer-family =' /etc/wgetrc &&
+			sed -i '/^[[:blank:]]*prefer-family =/c\prefer-family = IPv6' /etc/wgetrc ||
+			grep -q '^[[:blank:]#;]*prefer-family =' /etc/wgetrc &&
+			sed -i '/^[[:blank:]#;]*prefer-family =/c\prefer-family = IPv6' /etc/wgetrc ||
+			echo 'prefer-family = IPv6' >> /etc/wgetrc
+
+		elif [ "$INPUT_DEVICE_VALUE" = "auto" ]; then
+
+			# - APT allow IPv6
+			rm /etc/apt/apt.conf.d/99-dietpi-force-ipv4 &> /dev/null
+			# - Wget back to default
+			grep -q '^[[:blank:]]*prefer-family =' /etc/wgetrc &&
+			sed -i 's/^[[:blank:]]*prefer-family =/#prefer-family =/' /etc/wgetrc
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+		#Update dietpi.txt global
+		sed -i "/^CONFIG_PREFER_IPVERSION=/c\CONFIG_PREFER_IPVERSION=$INPUT_DEVICE_VALUE" /DietPi/dietpi.txt
+
+	}
+
+	Wifi_Modules_Main(){
+
+		local aWIFI_MODULES=()
+
+		# - All
+		aWIFI_MODULES=("cfg80211")
+
+		#NB: we need to start doing these device specific via $G_HW_MODEL index. This prevents unnecessary modules getting loaded.
+		# + RPi 3
+		aWIFI_MODULES+=("brcmfmac") #onboard WiFi
+		aWIFI_MODULES+=("brcmutil") #onboard WiFi
+
+		# + BPi Pro
+		aWIFI_MODULES+=("ap6211") #onboard
+
+		# + OrangePi Zero
+		if (( $G_HW_MODEL == 32 )); then
+
+			aWIFI_MODULES+=("xradio_wlan")
+
+		# + OrangePi Plus
+		elif (( $G_HW_MODEL == 34 )); then
+
+			aWIFI_MODULES+=("8189es")
+
+		# + Pine A64 / Asus tinker board (onboard)
+		elif (( $G_HW_MODEL == 40 || $G_HW_MODEL == 52 )); then
+
+			aWIFI_MODULES+=("8723bs")
+
+		# + NanoPi NEO Air / Zero 2+
+		elif (( $G_HW_MODEL == 35 || $G_HW_MODEL == 64 )); then
+
+			#4.9 uses brcm, only enable dhd for 3.x
+			if [ ! -d /boot/dtb ]; then
+
+				aWIFI_MODULES+=("dhd")
+
+			fi
+
+		fi
+
+		# + NanoPi T3
+		aWIFI_MODULES+=("bcmdhd")
+
+		# - Disable
+		if [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
+
+			rm /etc/modprobe.d/disable_wifi.conf &> /dev/null
+
+			#cfg80211 last
+			for ((i=$(( ${#aWIFI_MODULES[@]} - 1 )); i>=0; i--))
+			do
+
+				modprobe -rf "${aWIFI_MODULES[$i]}" 2> /dev/null
+				echo -e "blacklist ${aWIFI_MODULES[$i]}" >> /etc/modprobe.d/disable_wifi.conf
+
+			done
+
+			#Disable powersave being applied
+			systemctl disable wifi_disable_powersave &> /dev/null
+			rm /etc/systemd/system/wifi_disable_powersave.service &> /dev/null
+
+		# - Enable
+		elif [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
+
+			# - Install prereqs
+			G_AG_CHECK_INSTALL_PREREQ crda firmware-atheros firmware-brcm80211 firmware-ralink iw rfkill wireless-tools wpasupplicant
+			if (( $? != 0 )); then
+
+				exit 1
+
+			fi
+
+			rm /etc/modprobe.d/disable_wifi.conf &> /dev/null
+
+			# - Disable known powersaving options for specific chipsets
+			echo -e "options 8192cu rtw_power_mgnt=0" > /etc/modprobe.d/8192cu.conf
+			echo -e "options 8188eu rtw_power_mgnt=0" > /etc/modprobe.d/8188eu.conf
+			echo -e "options 8189es rtw_power_mgnt=0" > /etc/modprobe.d/8189es.conf #OPi Plus
+			echo -e "options 8723bs rtw_power_mgnt=0" > /etc/modprobe.d/8723bs.conf #PineA64
+			echo -e "options wlan_8192eu rtw_power_mgnt=0" > /etc/modprobe.d/wlan_8192eu.conf # Sparky/Allo WiFi
+
+			#cfg80211 first
+			for ((i=0; i<${#aWIFI_MODULES[@]}; i++))
+			do
+
+				modprobe "${aWIFI_MODULES[$i]}" 2> /dev/null
+
+			done
+
+			# - Delay. Without this, kernel reports wifi device not found with RPi 3 and Pine A64 addon board, when ran straight after this script.
+			G_DIETPI-NOTIFY 2 "Please wait, enabling WiFi Modules..."
+			sleep 3
+
+			#Update our networking file (refresh active wlan index)
+			/DietPi/dietpi/func/obtain_network_details
+
+			#Disable powersave on boot service:
+			cat << _EOF_ > /etc/systemd/system/wifi_disable_powersave.service
+[Unit]
+Description=Disable WiFi power management
+After=network.target network-online.target
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'sleep 20;iwconfig wlan$(sed -n 2p /DietPi/dietpi/.network) power off'
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+			systemctl daemon-reload
+			systemctl enable wifi_disable_powersave
+			systemctl start wifi_disable_powersave
+
+		elif [ "$INPUT_DEVICE_VALUE" = "onboard_enable" ]; then
+
+			#NB: Requires reboot
+			#NB: Do not change filenames, -f check used by DietPi-Config to obtain state
+
+			rm /etc/modprobe.d/disable_wifi_rpi3_onboard.conf &> /dev/null
+
+		elif [ "$INPUT_DEVICE_VALUE" = "onboard_disable" ]; then
+
+			#NB: Requires reboot
+			#NB: Do not change filenames, -f check used by DietPi-Config to obtain state
+
+			# - RPi 3/ZeroW
+			echo -e "blacklist brcmfmac" > /etc/modprobe.d/disable_wifi_rpi3_onboard.conf
+			echo -e "blacklist brcmutil" >> /etc/modprobe.d/disable_wifi_rpi3_onboard.conf
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+		unset aWIFI_MODULES
+
+	}
+
+	Wifi_Creds_Main(){
+
+		if [ -n "$INPUT_DEVICE_VALUE" ]; then
+
+			if [ "$INPUT_DEVICE_VALUE" = "set" ]; then
+
+				local Wifi_KEYMGR=$(grep -m1 '^AUTO_SETUP_NET_WIFI_KEYMGR=' /DietPi/dietpi.txt | sed 's/.*=//')
+				local Wifi_KEY="$(grep -m1 '^AUTO_SETUP_NET_WIFI_KEY=' /DietPi/dietpi.txt | sed 's/.*=//')"
+				local Wifi_SSID="$(grep -m1 '^AUTO_SETUP_NET_WIFI_SSID=' /DietPi/dietpi.txt | sed 's/.*=//')"
+
+				mkdir -p /etc/wpa_supplicant
+				cat << _EOF_ > /etc/wpa_supplicant/wpa_supplicant.conf
+country=$(grep -m1 '^CONFIG_WIFI_COUNTRY_CODE=' /DietPi/dietpi.txt | sed 's/.*=//')
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="$Wifi_SSID"
+_EOF_
+
+				# - Add KEY and type
+				if [ "$Wifi_KEYMGR" = "NONE" ]; then
+
+					cat << _EOF_ >> /etc/wpa_supplicant/wpa_supplicant.conf
+    key_mgmt=$Wifi_KEYMGR
+}
+_EOF_
+				elif  [ "$Wifi_KEYMGR" = "WPA-PSK" ]; then
+
+					cat << _EOF_ >> /etc/wpa_supplicant/wpa_supplicant.conf
+    key_mgmt=$Wifi_KEYMGR
+    psk="$Wifi_KEY"
+}
+_EOF_
+
+				elif  [ "$Wifi_KEYMGR" = "WEP" ]; then
+
+					Wifi_KEYMGR='NONE'
+					cat << _EOF_ >> /etc/wpa_supplicant/wpa_supplicant.conf
+    key_mgmt=$Wifi_KEYMGR
+    wep_key0="$Wifi_KEY"
+    wep_tx_keyidx=0
+}
+_EOF_
+				fi
+
+			else
+
+				Unknown_Input_Mode
+
+			fi
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	Wifi_Countrycode_Main(){
+
+		#Use country code from command input. Implies new setting.
+		if [ -n "$INPUT_DEVICE_VALUE" ]; then
+
+			#convert to uppercase: https://github.com/Fourdee/DietPi/issues/431
+			INPUT_DEVICE_VALUE=$(echo -e "$INPUT_DEVICE_VALUE" | tr '[:lower:]' '[:upper:]')
+
+			# - Apply value to DietPi.txt
+			sed -i "/^CONFIG_WIFI_COUNTRY_CODE=/c\CONFIG_WIFI_COUNTRY_CODE=$INPUT_DEVICE_VALUE" /DietPi/dietpi.txt
+
+			# - Update wpa_supplicant.conf
+			if [ -f /etc/wpa_supplicant/wpa_supplicant.conf ]; then
+
+				sed -i "/^country=/c\country=$INPUT_DEVICE_VALUE" /etc/wpa_supplicant/wpa_supplicant.conf
+
+			fi
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# serialconsole
+	#/////////////////////////////////////////////////////////////////////////////////////
+
+	MAX_SERIAL_CONSOLES=2 # ttySAC2 used by nanoPi m3
+
+	Serial_Main(){
+
+		#-------------------------------------------------------------------------------------
+		#Enable
+		if [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
+
+			#systemctl enable serial-getty@*.service # Wildcard does not work, we need to specify each possible tty device name
+			#systemctl enable serial-getty@ttyAMA[0-9].service # Number wildcards do not work, we need to specify each possible tty device number
+
+			G_DIETPI-NOTIFY 2 "Enabling known serial-getty services, please wait..."
+			systemctl enable serial-getty@.service
+			for ((i=0; i<=$MAX_SERIAL_CONSOLES; i++))
+			do
+
+				systemctl enable serial-getty@ttyAMA"$i".service
+				systemctl enable serial-getty@ttySAC"$i".service
+				systemctl enable serial-getty@ttyS"$i".service
+
+			done
+
+			#Device Specific:
+			# - RPi
+			if (( $G_HW_MODEL < 10 )); then
+
+				if (( ! $(cat /boot/cmdline.txt | grep -ci -m1 'console=ttyAMA0,115200 ') )); then
+
+					sed -i 's/console=tty1 /console=tty1 console=ttyAMA0,115200 /' /boot/cmdline.txt
+
+				fi
+
+				if (( $G_HW_MODEL == 3 )); then
+
+					# - Must use 250mhz core frequency, else, corrupt characters: https://github.com/Fourdee/DietPi/issues/306#issuecomment-222304202
+					sed -i '/core_freq=/c\core_freq=250' "$FP_RPI_CONFIG"
+
+				fi
+
+			# - Odroid C1
+			elif (( $G_HW_MODEL == 10 )); then
+
+				sed -i '/^setenv condev/c\setenv condev "console=tty0 console=ttyS0,115200n8"' /DietPi/boot.ini
+
+			# - Odroid XU4
+			elif (( $G_HW_MODEL == 11 )); then
+
+				if (( ! $(cat /DietPi/boot.ini | grep -ci -m1 'console=ttySAC2,115200n8 ') )); then
+
+					sed -i 's/console=tty1 /console=tty1 console=ttySAC2,115200n8 /' /DietPi/boot.ini
+
+				fi
+
+			# - Odroid C2
+			elif (( $G_HW_MODEL == 12 )); then
+
+				sed -i '/^setenv condev/c\setenv condev "console=tty0 console=ttyS0,115200n8"' /DietPi/boot.ini
+
+			# - Pine A64
+			elif (( $G_HW_MODEL == 40 )); then
+
+				if (( ! $(cat /DietPi/uEnv.txt | grep -ci -m1 'console=ttyS0,115200n8 ') )); then
+
+					sed -i 's/console=tty0 /console=tty0 console=ttyS0,115200n8 /' /DietPi/uEnv.txt
+
+				fi
+
+			fi
+
+			# - Update dietpi.txt global var
+			sed -i '/^CONFIG_SERIAL_CONSOLE_ENABLE=/c\CONFIG_SERIAL_CONSOLE_ENABLE=1' /DietPi/dietpi.txt
+
+
+		#-------------------------------------------------------------------------------------
+		#Disable
+		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
+
+			#Disable services. Although, this seems to have no effect on the cmdline.txt boot.ini etc serial console entries. They run regardless. But lets do it for consistency.
+			G_DIETPI-NOTIFY 2 "Disabling known serial-getty services, please wait..."
+			systemctl disable serial-getty@.service
+			for ((i=0; i<=$MAX_SERIAL_CONSOLES; i++))
+			do
+
+				systemctl disable serial-getty@ttyAMA"$i".service
+				systemctl disable serial-getty@ttySAC"$i".service
+				systemctl disable serial-getty@ttyS"$i".service
+
+			done
+
+			#Device Specific:
+			# - RPi
+			if (( $G_HW_MODEL < 10 )); then
+
+				# RPi 1/2
+				sed -i 's/console=ttyAMA0,115200 //' /boot/cmdline.txt
+
+				# + RPi 3 (old entry, now uses AMA0 with 4.4.21)
+				sed -i 's/console=ttyS0,115200 //' /boot/cmdline.txt
+
+				# RPi 3 - Put core freq back to default (400mhz), if set to 250mhz.
+				if (( $G_HW_MODEL == 3 &&
+					$(cat "$FP_RPI_CONFIG" | grep -m1 'core_freq=' | sed 's/.*=//') == 250 )); then
+
+					sed -i '/core_freq=/c\#core_freq=400' "$FP_RPI_CONFIG"
+
+				fi
+
+			# - Odroid C1
+			elif (( $G_HW_MODEL == 10 )); then
+
+				sed -i '/^setenv condev/c\setenv condev "console=tty0"' /DietPi/boot.ini
+
+			# - Odroid XU4
+			elif (( $G_HW_MODEL == 11 )); then
+
+				sed -i 's/console=ttySAC2,115200n8 //' /DietPi/boot.ini
+
+			# - Odroid C2
+			elif (( $G_HW_MODEL == 12 )); then
+
+				sed -i '/^setenv condev/c\setenv condev "console=tty0"' /DietPi/boot.ini
+
+			# - Pine A64
+			elif (( $G_HW_MODEL == 40 )); then
+
+				sed -i 's/console=ttyS0,115200n8 //' /DietPi/uEnv.txt
+
+			fi
+
+			# - Update dietpi.txt global var
+			sed -i '/^CONFIG_SERIAL_CONSOLE_ENABLE=/c\CONFIG_SERIAL_CONSOLE_ENABLE=0' /DietPi/dietpi.txt
+
+		else
+			Unknown_Input_Mode
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# soundcard
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#NB: When adding a new dtoverlay soundcard, we must add the dtoverlay name for deletion in Soundcard_Reset_RPi()
+	SOUNDCARD_TARGET_CARD=0
+	SOUNDCARD_TARGET_DEVICE=0
+	ALSA_EQ_ENABLED=0
+
+	#Disable all soundcards and revert back to default output if available.
+	Soundcard_Reset_All(){
+
+		SOUNDCARD_TARGET_CARD=0
+		SOUNDCARD_TARGET_DEVICE=0
+		ALSA_EQ_ENABLED=0
+
+		#Remove previous asound.conf
+		rm /etc/asound.conf &> /dev/null
+
+		# - Pre-Reqs for any soundcard
+		if (( ! $(dpkg --get-selections | grep -ci -m1 '^alsa-utils') )); then
+
+			G_DIETPI-NOTIFY 2 "Installing alsa-utils. Please wait..."
+			G_AGI alsa-utils
+
+		fi
+
+		#HW specific
+		# - RPI
+		if (( $G_HW_MODEL < 10 )); then
+
+			Soundcard_Reset_RPi
+
+		# - Odroid
+		elif (( $G_HW_MODEL >= 10 && $G_HW_MODEL < 20 )); then
+
+			Soundcard_Reset_Odroid
+
+		# - OPi Zero (H2+)
+		elif (( $G_HW_MODEL == 32 )); then
+
+			Soundcard_Reset_H2
+
+		# - H3
+		elif (( $G_HW_CPUID == 1 )); then
+
+			Soundcard_Reset_H3
+
+		# - Pine a64
+		elif (( $G_HW_MODEL == 40 )); then
+
+			Soundcard_Reset_PineA64
+
+		# - BPi Pro
+		elif (( $G_HW_MODEL == 51 )); then
+
+			Soundcard_Reset_BPi_Pro
+
+		#Sparky SBC
+		elif (( $G_HW_MODEL == 70 )); then
+
+			Soundcard_Reset_SparkySBC
+
+		#ASUS
+		elif (( $G_HW_MODEL == 52 )); then
+
+			Soundcard_Reset_Asus
+
+		fi
+
+	}
+
+	Soundcard_Reset_RPi(){
+
+		# - Add dtparam=audio=off
+		#	as of 4.4 kernel: https://github.com/Fourdee/DietPi/issues/327
+		if (( $(cat "$FP_RPI_CONFIG" | grep -ci -m1 'dtparam=audio=') == 0 )); then
+
+			echo -e "dtparam=audio=off" >> "$FP_RPI_CONFIG"
+
+		else
+
+			sed -i '/dtparam=audio=/c\dtparam=audio=off' "$FP_RPI_CONFIG"
+
+		fi
+
+		# - Disable known soundcard dtoverlays
+		sed -i '/dtoverlay=rpi-bcm2835/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=hifiberry/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=iqaudio/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=justboom/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=allo-/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=rpi-dac/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=i-sabre-k2m/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=dionaudio/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=googlevoicehat-soundcard/d' "$FP_RPI_CONFIG"
+
+		# - Disable i2s maps
+		sed -i '/dtoverlay=i2s-mmap/d' "$FP_RPI_CONFIG"
+		sed -i '/dtparam=i2s=/d' "$FP_RPI_CONFIG"
+
+		#	onboard blacklist module
+		echo -e "blacklist snd-bcm2835" > /etc/modprobe.d/rpi-bcm2708.conf
+
+		sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=1' "$FP_RPI_CONFIG"
+
+		# - forced analogue out
+		systemctl disable rpi-bcm2835_forced_3.5mm.service &> /dev/null
+		rm /etc/systemd/system/rpi-bcm2835_forced_3.5mm.service &> /dev/null
+		systemctl daemon-reload
+
+	}
+
+	Soundcard_Reset_Odroid(){
+
+		# - hifi shield plus
+		sed -i '/snd-soc-pcm5102/d' /etc/modules
+		sed -i '/snd-soc-odroid-dac/d' /etc/modules
+
+		# - hifi shield 2
+		sed -i '/snd-soc-pcm512x/d' /etc/modules
+		sed -i '/snd-soc-pcm512x-i2c/d' /etc/modules
+		sed -i '/snd-soc-odroid-dac2/d' /etc/modules
+
+		if [ -f /etc/systemd/system/odroid-hifishield2.service ]; then
+
+			rm /etc/systemd/system/odroid-hifishield2.service
+			systemctl daemon-reload
+
+		fi
+
+	}
+
+	Soundcard_Reset_H2(){
+
+		#set 3.5mm
+		amixer set -c 0 'Audio lineout' unmute &> /dev/null
+
+	}
+
+	Soundcard_Reset_H3(){
+
+		#set hdmi
+		amixer set -c 0 'Audio lineout' mute &> /dev/null
+
+		SOUNDCARD_TARGET_CARD=1
+
+	}
+
+	Soundcard_Reset_Asus(){
+
+		#set hdmi
+		SOUNDCARD_TARGET_CARD=1
+
+	}
+
+	Soundcard_Reset_SparkySBC(){
+
+		sed -i '/snd-soc-allo-piano-dac/d' /etc/modules
+
+		# - HDMI
+		SOUNDCARD_TARGET_DEVICE=1
+		amixer -c 0 sset 'audio output mode switch' 'hdmi'
+
+		sed -i 's/aotg.aotg1_speed=1/aotg.aotg1_speed=0/' /DietPi/uEnv.txt
+
+	}
+
+	Soundcard_Reset_PineA64(){
+
+		rm /etc/modules-load.d/pine64-audiojack.conf
+
+	}
+
+	Soundcard_Reset_BPi_Pro(){
+
+		#3.5mm: https://github.com/Fourdee/DietPi/issues/732#issuecomment-275915919
+		SOUNDCARD_TARGET_CARD=0
+
+		amixer sset 'Left Mixer Left DAC' off
+		amixer sset 'Power Amplifier' 62
+		amixer sset 'Power Amplifier DAC' on
+		amixer sset 'Power Amplifier Mixer' off
+		amixer sset 'Power Amplifier Mute' on
+		amixer sset 'Right Mixer Left DAC' off
+		amixer sset 'Right Mixer Right DAC' off
+
+	}
+
+	Soundcard_Main(){
+
+		#-----------------------------------------------------------------------------
+		#Always reset soundcards and revert back to HDMI
+		Soundcard_Reset_All
+		#-----------------------------------------------------------------------------
+		#Apply specific asound.confs and additional settings
+
+		# - ALSA EQ enabled?
+		if [[ $INPUT_DEVICE_VALUE == *-eq ]]; then
+
+			ALSA_EQ_ENABLED=1
+
+			# - remove -eq from string so it doesn't get sent as a dtoverlay= on rpi and dietpi.txt entry
+			INPUT_DEVICE_VALUE=$(echo -e "$INPUT_DEVICE_VALUE" | sed 's/-eq//g')
+
+		fi
+
+		# - Update DietPi global soundcard var
+		sed -i "/^CONFIG_SOUNDCARD=/c\CONFIG_SOUNDCARD=$INPUT_DEVICE_VALUE" /DietPi/dietpi.txt
+
+		# - RPi: Enable DTPARAM audio setting
+		if (( $G_HW_MODEL < 10 )); then
+
+			# - Enable dtparam audio
+			sed -i '/dtparam=audio=/c\dtparam=audio=on' "$FP_RPI_CONFIG"
+
+		fi
+
+		#Cards
+		case "$INPUT_DEVICE_VALUE" in
+
+			#ALL: ----------------------------------------------------------------------
+
+			#Specify card + device indexs
+			hw:*)
+
+				echo -e "$INPUT_DEVICE_VALUE"
+				local split=$(echo -e "$INPUT_DEVICE_VALUE" | sed 's/,/ /g' | sed 's/hw://g' | sed 's/-eq//g')
+				SOUNDCARD_TARGET_CARD=$(echo -e "$split" | awk '{print $1}' )
+				SOUNDCARD_TARGET_DEVICE=$(echo -e "$split" | awk '{print $2}' )
+
+			;;
+
+			usb-dac)
+
+				# - detect card
+				local usb_detection_card_index=$(aplay -l | grep -m1 'USB Audio' | awk '{print $2}' | sed 's/://g')
+				if [[ $usb_detection_card_index =~ ^-?[0-9]+$ ]]; then
+
+					SOUNDCARD_TARGET_CARD=$usb_detection_card_index
+
+				# - Not found
+				else
+
+					G_DIETPI-NOTIFY 1 "Unable to find a USB-DAC on system."
+					EXIT_CODE=1
+
+					# - Reset
+					sed -i "/^CONFIG_SOUNDCARD=/c\CONFIG_SOUNDCARD=none" /DietPi/dietpi.txt
+
+				fi
+
+				SOUNDCARD_TARGET_DEVICE=0
+
+				# - SparkySBC, enable aotg.aotg1_speed compatibility setting for USB 1.1, when USB-DAC configured: https://github.com/Fourdee/DietPi/issues/1301
+				if (( $G_HW_MODEL == 70 )); then
+
+					sed -i 's/aotg.aotg1_speed=0/aotg.aotg1_speed=1/' /DietPi/uEnv.txt
+
+				fi
+
+			;;
+
+			#RPi -------------------------------------------------------------------------------
+
+			#rpi-bcm2835
+			#rpi-bcm2835-ultrahq
+			#rpi-bcm2835-3.5mm
+			#rpi-bcm2835-ultrahq-3.5mm
+			rpi-bcm2835*)
+
+				# - remove from blacklist to enable:
+				rm /etc/modprobe.d/rpi-bcm2708.conf
+
+				# - Enable HQ audio
+				sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=0' "$FP_RPI_CONFIG"
+
+				# - Expermental UltraHQ audio: https://www.raspberrypi.org/forums/viewtopic.php?p=907075#p907075
+				if [[ $INPUT_DEVICE_VALUE == *ultrahq* ]]; then
+
+					sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=2' "$FP_RPI_CONFIG"
+
+				fi
+
+				# - Force 3.5mm out?
+				if [[ $INPUT_DEVICE_VALUE == *3.5mm* ]]; then
+
+					cat << _EOF_ > /etc/systemd/system/rpi-bcm2835_forced_3.5mm.service
+[Unit]
+Description=Forces sound through 3.5mm analogue
+Before=sound.target
+After=dietpi-boot.service dietpi-ramdisk.service dietpi-ramlog.service
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+
+ExecStart=/usr/bin/amixer -c 0 cset numid=3 1
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+					systemctl daemon-reload
+					systemctl enable rpi-bcm2835_forced_3.5mm.service
+					systemctl start rpi-bcm2835_forced_3.5mm.service
+
+				fi
+
+			;;
+
+			#hifiberry-dac
+			#hifiberry-dacplus
+			#hifiberry-digi
+			#hifiberry-digi-pro
+			#hifiberry-amp
+			hifiberry-*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#googlevoicehat-soundcard
+			googlevoicehat-soundcard*)
+
+				# - enable dtoverlay
+				cat << _EOF_ >> "$FP_RPI_CONFIG"
+dtoverlay=$INPUT_DEVICE_VALUE
+dtoverlay=i2s-mmap
+dtparam=i2s=on
+_EOF_
+
+			;;
+
+			#JustBoom-dac: DAC HAT, Amp HAT, DAC Zero and Amp Zero
+			#JustBoom-digi: Digi HAT and Digi Zero
+			justboom-*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#RPi (dtoverlay)
+			#	allo-piano-dac-pcm512x-audio
+			#	allo-piano-dac-plus-pcm512x-audio (2.1)
+			#Sparky SBC (module)
+			#	snd-soc-allo-piano-dac
+			#	snd-soc-allo-piano-dac-plus (2.1)
+			*allo-piano-dac*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+				# + Sparky SBC
+				if (( $G_HW_MODEL == 70 )); then
+
+					echo -e "$INPUT_DEVICE_VALUE" >> /etc/modules
+					SOUNDCARD_TARGET_CARD=1
+					SOUNDCARD_TARGET_DEVICE=0
+					amixer -c 0 sset 'audio output mode switch' 'i2s'
+
+				fi
+
+			;;
+
+			#RPi (dtoverlay)
+			#	allo-boss-dac-pcm512x-audio
+			*allo-boss-dac*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#RPi (dtoverlay)
+			#	allo-digione
+			*allo-digione*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#RPi (dtoverlay)
+			#	rpi-dac
+			rpi-dac)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#AudioPhonics I-Sabre-K2M (dtoverlay)
+			#	i-sabre-k2m
+			i-sabre-k2m)
+
+				# - Install binaries
+				local install_url_address='http://dietpi.com/downloads/binaries/rpi/I-Sabre-K2M_binaries.zip'
+
+				G_CHECK_URL "$install_url_address"
+				if (( $? == 0 )); then
+
+					wget "$install_url_address" -O package.zip
+					unzip -o package.zip -d /
+					rm package.zip
+
+					sync
+					depmod -a
+
+					# - enable dtoverlay
+					echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+					# - i2c
+					sed -i '/dtparam=i2c_arm=/c\dtparam=i2c_arm=on' "$FP_RPI_CONFIG"
+
+				else
+
+					G_DIETPI-NOTIFY 1 "Failed to install $INPUT_DEVICE_NAME. $install_url_address may be offline or unreachable."
+
+				fi
+
+			;;
+
+			#Sparky SBC -------------------------------------------------------------------------------
+			#allo-cheapo-analogue	#3.5mm/RCA
+			#allo-cheapo-optical	#Optical out
+			allo-cheapo*)
+
+				SOUNDCARD_TARGET_CARD=0
+				SOUNDCARD_TARGET_DEVICE=0
+
+				# - Vol
+				amixer –c 0 set 'DAC PA' 35
+
+				if [ "$INPUT_DEVICE_VALUE" = "allo-cheapo-analogue" ]; then
+
+					amixer -c 0 sset 'audio output mode switch' 'i2s'
+
+				else
+
+					amixer -c 0 sset 'audio output mode switch' 'spdif'
+					SOUNDCARD_TARGET_DEVICE=2
+
+				fi
+
+			;;
+
+			iqaudio-*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#dionaudio-loco
+			#dionaudio-loco-v2
+			dionaudio-loco*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#Odroid -------------------------------------------------------------------------------
+			odroid-hifishield-plus)
+
+				echo -e "snd-soc-pcm5102" >> /etc/modules
+				echo -e "snd-soc-odroid-dac" >> /etc/modules
+
+				SOUNDCARD_TARGET_CARD=1
+
+			;;
+
+			odroid-hifishield-2)
+
+				sed -i '/^aml_i2c/d' /etc/modules # shared module, remove all previous entries before adding
+				echo -e "aml_i2c" >> /etc/modules
+				echo -e "snd-soc-pcm512x" >> /etc/modules
+				echo -e "snd-soc-pcm512x-i2c" >> /etc/modules
+				echo -e "snd-soc-odroid-dac2" >> /etc/modules
+
+				SOUNDCARD_TARGET_CARD=1
+
+				cat << _EOF_ > /etc/systemd/system/odroid-hifishield2.service
+[Unit]
+Description=odroid-hifishield2
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+ExecStart=/bin/bash -c 'echo pcm5242 0x4c > /sys/class/i2c-adapter/i2c-1/new_device'
+ExecStart=/bin/bash -c 'amixer -c 1 sset Analogue 0'
+ExecStart=/bin/bash -c 'amixer -c 1 sset Digital 201'
+ExecStart=/bin/bash -c 'amixer -c 1 sset Deemphasis on'
+
+[Install]
+WantedBy=sound.target
+_EOF_
+				systemctl enable odroid-hifishield2.service
+				systemctl daemon-reload
+
+			;;
+
+			#H2 -------------------------------------------------------------------------------
+			h2-hdmi)
+
+				amixer set -c 0 'Audio lineout' mute &> /dev/null
+				SOUNDCARD_TARGET_CARD=1
+
+			;;
+
+			#H3 -------------------------------------------------------------------------------
+			h3-analogue)
+
+				amixer set -c 0 'Audio lineout' unmute &> /dev/null
+				SOUNDCARD_TARGET_CARD=0
+
+			;;
+
+			#Pine A64 -------------------------------------------------------------------------------
+			pine64-analogue)
+
+				cat << _EOF_ > /etc/modules-load.d/pine64-audiojack.conf
+sunxi_codec
+sunxi_i2s
+sunxi_sndcodec
+_EOF_
+
+				SOUNDCARD_TARGET_CARD=1
+
+			;;
+
+			#Rock64 -------------------------------------------------------------------------------
+			rock64-analogue)
+
+				SOUNDCARD_TARGET_CARD=1
+
+			;;
+
+			#NanoPi M2/M3 -------------------------------------------------------------------------------
+			s5pxx18-hdmi)
+
+				SOUNDCARD_TARGET_CARD=1
+
+			;;
+
+			#Asus tinker -------------------------------------------------------------------------------
+			asus-tb-analogue)
+
+				SOUNDCARD_TARGET_CARD=0
+				SOUNDCARD_TARGET_DEVICE=2
+
+			;;
+
+		esac
+
+		# - Apply asound.conf
+		if [[ "$INPUT_DEVICE_VALUE" = 'googlevoicehat-soundcard'* ]]; then
+
+			cat << _EOF_ > /etc/asound.conf
+pcm.softvol {
+    type softvol
+    slave.pcm dmix
+    control {
+        name Master
+        card 0
+    }
+}
+
+pcm.micboost {
+    type route
+    slave.pcm dsnoop
+    ttable {
+        0.0 30.0
+        1.1 30.0
+    }
+}
+
+pcm.!default {
+    type asym
+    playback.pcm "plug:softvol"
+    capture.pcm "plug:micboost"
+}
+
+ctl.!default {
+    type hw
+    card 0
+}
+_EOF_
+
+		elif (( $ALSA_EQ_ENABLED )); then
+
+			cat << _EOF_ > /etc/asound.conf
+ctl.eq {
+    type equal
+    controls "$HOME/.alsaequal.bin"
+}
+
+pcm.plugequal {
+    type equal
+    slave.pcm "plughw:$SOUNDCARD_TARGET_CARD,$SOUNDCARD_TARGET_DEVICE"
+    controls "$HOME/.alsaequal.bin"
+}
+
+pcm.!default {
+    type plug
+    slave.pcm plugequal
+    slave.channels 2
+}
+
+ctl.!default {
+    type hw
+    card $SOUNDCARD_TARGET_CARD
+}
+_EOF_
+
+			if (( ! $(dpkg --get-selections | grep -ci -m1 '^libasound2-plugin-equal') )); then
+
+				G_AGI libasound2-plugin-equal
+
+			fi
+
+		else
+
+			cat << _EOF_ > /etc/asound.conf
+pcm.!default {
+    type hw
+    card $SOUNDCARD_TARGET_CARD
+    device $SOUNDCARD_TARGET_DEVICE
+}
+ctl.!default {
+    type hw
+    card $SOUNDCARD_TARGET_CARD
+}
+_EOF_
+
+		fi
+
+	}
+
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	# Main Loop
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#-----------------------------------------------------------------------------------
+	#info
+
+	G_DIETPI-NOTIFY 3 DietPi-Set_Hardware "$INPUT_DEVICE_NAME ($INPUT_DEVICE_VALUE)"
+
+	#-----------------------------------------------------------------------------------
+	if [ "$INPUT_DEVICE_NAME" = "soundcard" ]; then
+
+		Soundcard_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "serialconsole" ]; then
+
+		Serial_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "bluetooth" ]; then
+
+		Bluetooth_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "wifimodules" ]; then
+
+		Wifi_Modules_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "wificreds" ]; then
+
+		Wifi_Creds_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "preferipversion" ]; then
+
+		Prefer_IPversion
+
+	elif [ "$INPUT_DEVICE_NAME" = "wificountrycode" ]; then
+
+		Wifi_Countrycode_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "i2c" ]; then
+
+		I2c_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "lcdpanel" ]; then
+
+		Lcd_Panel_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "rpi-opengl" ]; then
+
+		RPi_OpenGL_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "eth-forcespeed" ]; then
+
+		Eth_Force_Speed_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "remoteir" ]; then
+
+		RemoteIR_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "gpumemsplit" ]; then
+
+		Gpu_Memory_Split_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "rpi-camera" ]; then
+
+		RPi_Camera_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "rpi3_usb_boot" ]; then
+
+		RPi_USB_Boot_Main
+
+	else
+
+		Unknown_Input_Name
+
+	fi
+
+	#-----------------------------------------------------------------------------------
+	G_DIETPI-NOTIFY -1 $EXIT_CODE "$INPUT_DEVICE_NAME $INPUT_DEVICE_VALUE |"
+	#-----------------------------------------------------------------------------------
+	exit $EXIT_CODE
+	#-----------------------------------------------------------------------------------
+}

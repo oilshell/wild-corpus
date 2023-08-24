@@ -1,0 +1,1 @@
+/etc/alternatives/x86_64-linux-gnu_nvidia_bug_report

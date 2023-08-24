@@ -1,0 +1,31 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Valery Kartel <valery.kartel@gmail.com>
+pkgname=perl-cgi-fast
+_pkgreal=CGI-Fast
+pkgver=2.12
+pkgrel=0
+pkgdesc="CGI Interface for Fast CGI"
+url="http://search.cpan.org/dist/CGI-Fast"
+arch="noarch"
+license="PerlArtistic GPL"
+depends="perl-cgi perl-fcgi"
+depends_dev=""
+makedepends="$depends_dev perl-dev"
+install=""
+subpackages="$pkgname-doc"
+source="http://search.cpan.org/CPAN/authors/id/L/LE/LEEJO/$_pkgreal-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgreal-$pkgver"
+
+build() {
+	cd "$builddir"
+	PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor || return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	find "$pkgdir" \( -name perllocal.pod -o -name .packlist \) -delete
+}
+
+sha512sums="00452a2c31eb8fd877808764508a491894d87986bda493b2b15773cd29f2699184559f0c55af1af1684c851005b61eb1364bccae7ba4f4df3166d9020c15b40e  CGI-Fast-2.12.tar.gz"

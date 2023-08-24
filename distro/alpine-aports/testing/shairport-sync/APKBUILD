@@ -1,0 +1,51 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer:
+pkgname=shairport-sync
+pkgver=3.1.2
+pkgrel=0
+pkgdesc="AirTunes emulator. Shairport Sync adds multi-room capability with Audio Synchronisation"
+url="https://github.com/mikebrady/shairport-sync"
+arch="all"
+license="custom"
+depends="avahi"
+makedepends="autoconf automake libtool alsa-lib-dev libdaemon-dev popt-dev
+	libressl-dev soxr-dev avahi-dev libconfig-dev"
+subpackages="$pkgname-doc"
+source="$pkgname-$pkgver.tar.gz::https://github.com/mikebrady/$pkgname/archive/$pkgver.tar.gz
+	$pkgname.initd"
+builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	default_prepare
+	cd "$builddir"
+	autoreconf -i -f
+}
+
+build() {
+	cd "$builddir"
+
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--with-piddir=/run \
+		--with-alsa \
+		--with-avahi \
+		--with-ssl=openssl \
+		--with-soxr
+	make
+}
+
+package() {
+	cd "$builddir"
+
+	make DESTDIR="$pkgdir" install
+	install -m 755 -D "$srcdir"/$pkgname.initd "$pkgdir"/etc/init.d/$pkgname
+}
+
+sha512sums="7d1606c776352e00c2fe1c96cea556d489f7b7399519db8a1e2479a54d4a1ad4c4efc407f862699ace0b8500489669de5a5f1f3c5a2054901bd8cad44cda6141  shairport-sync-3.1.2.tar.gz
+aeead51ef0f17d360bb1e2d2ae897974ef507ef56db84e6aeb79d8ec522c3bb9336f01ff4150e70fecfebf9808dd7190cb2839e287cf0ef6e1886504c1f1edc6  shairport-sync.initd"

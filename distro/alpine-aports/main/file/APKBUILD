@@ -1,0 +1,40 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=file
+pkgver=5.32
+pkgrel=0
+pkgdesc="File type identification utility"
+url="http://www.darwinsys.com/file/"
+arch="all"
+license="BSD"
+subpackages="$pkgname-dev $pkgname-doc libmagic"
+source="ftp://ftp.astron.com/pub/$pkgname/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--datadir=/usr/share
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+libmagic() {
+	pkgdesc="File type identification library"
+	mkdir -p "$subpkgdir"/usr
+	mv "$pkgdir"/usr/lib "$pkgdir"/usr/share "$subpkgdir"/usr
+}
+
+sha512sums="315343229fa196335389544ee8010e9e80995ef4721938492dedcfb0465dfc45e1feb96f26dfe53cab484fb5d9bac54d2d72917fbfd28a1d998c6ad8c8f9792f  file-5.32.tar.gz"

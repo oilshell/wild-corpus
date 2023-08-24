@@ -1,0 +1,35 @@
+# Contributor: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+# Maintainer: Kaarle Ritvanen <kaarle.ritvanen@datakunkku.fi>
+pkgname=py-django-treebeard
+pkgver=4.1.2
+pkgrel=0
+pkgdesc="Efficient tree implementations for Django"
+url=https://tabo.pe/projects/django-treebeard/
+arch=noarch
+license="ASL 2.0"
+depends=py-django
+makedepends=py-setuptools
+source="https://files.pythonhosted.org/packages/source/d/django-treebeard/django-treebeard-$pkgver.tar.gz"
+
+_builddir=$srcdir/django-treebeard-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	python2 setup.py build
+}
+
+package() {
+	cd "$_builddir"
+	python2 setup.py install --root "$pkgdir"
+}
+
+sha512sums="71875336c753afdc3a7088975ec4de4509e9cab7cd02a9e44de3d932c69b492c03102c6879a2de5386f94c9357d85fff12d3a3515d4ce7e0185c34cfe70e8c75  django-treebeard-4.1.2.tar.gz"

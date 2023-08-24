@@ -1,0 +1,58 @@
+# Contributor: Łukasz Jendrysik <scadu@yandex.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libxfce4ui
+pkgver=4.12.1
+pkgrel=3
+pkgdesc="Widgets library for the Xfce desktop environment"
+url="http://www.xfce.org/"
+arch="all"
+license="GPL2"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang $pkgname-gtk3"
+depends=
+depends_dev="startup-notification-dev"
+makedepends="$depends_dev gtk+2.0-dev gtk+3.0-dev libxfce4util-dev xfconf-dev
+	glade3-dev"
+source="http://archive.xfce.org/src/xfce/${pkgname}/${pkgver%.*}/${pkgname}-${pkgver}.tar.bz2"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--libexecdir=/usr/lib \
+		--localstatedir=/var \
+		--enable-gladeui \
+		--with-vendor-info="Alpine Linux" \
+		--disable-static \
+		--disable-gtk-doc
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+dev() {
+	default_dev
+	mkdir -p "$subpkgdir"/usr/lib "$subpkgdir"/usr/share
+	mv "$pkgdir"/usr/lib/glade3 "$subpkgdir"/usr/lib/
+	mv "$pkgdir"/usr/share/glade3 "$subpkgdir"/usr/share/
+}
+
+gtk3() {
+	mkdir -p "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/libxfce4ui-2.so.* \
+		"$pkgdir"/usr/lib/libxfce4kbd-private-3.so.* \
+		"$subpkgdir"/usr/lib/
+}
+md5sums="ea9fad7d059fe8f531fe8db42dabb5a9  libxfce4ui-4.12.1.tar.bz2"
+sha256sums="3d619811bfbe7478bb984c16543d980cadd08586365a7bc25e59e3ca6384ff43  libxfce4ui-4.12.1.tar.bz2"
+sha512sums="9d132a81bc3385b6582c2d97ed7a1fc0ea289d9098cc4c3a7fb523329eb6afb18716bcf98a5832c4484794eb7a2be4242fa2e71083cd5e55cb19e3b8003458a8  libxfce4ui-4.12.1.tar.bz2"

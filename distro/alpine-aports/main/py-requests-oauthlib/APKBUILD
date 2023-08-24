@@ -1,0 +1,47 @@
+# Maintainer: Peter Bui <pnutzh4x0r@gmail.com>
+pkgname=py-requests-oauthlib
+_pkgname=requests-oauthlib
+pkgver=0.8.0
+pkgrel=0
+pkgdesc="First-class OAuth library support for Requests"
+url="https://pypi.python.org/pypi/requests-oauthlib"
+arch="noarch"
+license="BSD"
+depends="py-oauthlib py-requests"
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="https://files.pythonhosted.org/packages/source/${_pkgname:0:1}/$_pkgname/$_pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	depends="${depends//py-/py2-}"
+	_py python2
+}
+
+_py3() {
+	replaces="$pkgname"
+	depends="${depends//py-/py3-}"
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+sha512sums="267c6f60cefecc133495d7407986ae23d238ad449cfbbcf2148b444a2498445991677bf416074bae59e16881953d52d338aa2c1470432ca608797ca3d2bcd999  requests-oauthlib-0.8.0.tar.gz"

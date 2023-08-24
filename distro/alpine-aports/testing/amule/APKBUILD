@@ -1,0 +1,51 @@
+# Contributor: August Klein <amatcoder@gmail.com>
+# Maintainer: August Klein <amatcoder@gmail.com>
+pkgname=amule
+_pkgname=aMule-SVN-r
+pkgver=10929
+pkgrel=0
+pkgdesc="An eMule-like client for the eD2k and Kademlia networks"
+url="http://www.amule.org"
+arch="all"
+license="GPL2"
+makedepends="bison crypto++-dev gd-dev geoip-dev libsm-dev libupnp-dev wxgtk2.8-dev"
+subpackages="$pkgname-lang $pkgname-doc"
+source="http://amule.sourceforge.net/tarballs/${_pkgname}${pkgver}.tar.bz2"
+builddir=$srcdir/${_pkgname}${pkgver}
+
+prepare() {
+	cd "$builddir"
+	update_config_sub
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		CPPFLAGS="$CPPFLAGS -Wno-unused-local-typedefs" \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--mandir=/usr/share/man \
+		--with-wxversion=2.8 \
+		--enable-amule-daemon \
+		--enable-amulecmd \
+		--enable-amule-gui \
+		--enable-webserver \
+		--enable-alc \
+		--enable-alcc \
+		--enable-geoip \
+		--enable-upnp \
+		--disable-debug \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	rm -f "$pkgdir"/usr/lib/charset.alias
+}
+
+md5sums="7ddadf74e5d379c4c6b61fb4602153a5  aMule-SVN-r10929.tar.bz2"
+sha256sums="0bf7210c62e44da2d4f349ded34307ff283333746d3122fbb19496122a855f13  aMule-SVN-r10929.tar.bz2"
+sha512sums="e5757f5d06d0266a46b1ed89e1e360ebefd0c1792267fe3d731d3dda383f35fb7a336415510ab749c965ea012953fd3f0616f8461840f97e99cde8da8dcab672  aMule-SVN-r10929.tar.bz2"

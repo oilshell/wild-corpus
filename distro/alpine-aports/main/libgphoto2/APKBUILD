@@ -1,0 +1,45 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=libgphoto2
+pkgver=2.5.14
+pkgrel=0
+pkgdesc="The core library of gphoto2, designed to allow access to digital camera by external programs."
+url="http://www.gphoto.org"
+arch="all"
+license="LGPL"
+depends=""
+depends_dev="libexif-dev libusb-dev"
+makedepends="$depends_dev libjpeg-turbo-dev libtool"
+install="$pkgname.pre-install $pkgname.pre-upgrade"
+subpackages="$pkgname-dev $pkgname-doc"
+replaces="libgphoto2-dev"
+source="http://downloads.sourceforge.net/gphoto/libgphoto2-$pkgver.tar.bz2"
+options="libtool"
+
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	udevscriptdir=/lib/udev ./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--with-drivers=all \
+		--disable-static \
+		--disable-rpath \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+	rm -f "$pkgdir"/usr/lib/libgphoto2/*/*.a \
+		"$pkgdir"/usr/lib/*.a
+
+	install -m755 -d "$pkgdir/lib/udev/rules.d"
+	LD_LIBRARY_PATH="$pkgdir/usr/lib${LD_LIBRARY_PATH:+:}$LD_LIBRARY_PATH" \
+		CAMLIBS="$pkgdir/usr/lib/libgphoto2/$pkgver" \
+		"$pkgdir/usr/lib/libgphoto2/print-camera-list" udev-rules version 136 group camera mode 0660 > "$pkgdir/lib/udev/rules.d/54-gphoto.rules" || return 1
+}
+
+sha512sums="6dd75700e2b2afdf87f7eab4c62fbbe2c42f9154d644edfae25e3d5fbe5ed0894be832cc1367933fc6c113a1cc379d1956fecf108d6ee240935b9d7e2f614688  libgphoto2-2.5.14.tar.bz2"

@@ -1,0 +1,177 @@
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Jakub Jirutka <jakub@jirutka.cz>
+pkgname=jruby
+pkgver=9.1.13.0
+pkgrel=0
+pkgdesc="An implementation of Ruby on the JVM"
+url="http://jruby.org"
+arch="noarch"
+license="EPL GPL-2 LGPL-2.1 custom"
+# libc6-compat: https://github.com/jnr/jnr-posix/issues/73
+depends="$pkgname-libs java-jffi-native>=1.2 libc6-compat>=1.1.12-r5 openjdk8-jre-base"
+makedepends="openjdk8 zip"
+subpackages="
+	$pkgname-did_you_mean
+	$pkgname-irb
+	$pkgname-minitest
+	$pkgname-net-telnet:net_telnet
+	$pkgname-power_assert
+	$pkgname-rake
+	$pkgname-rdoc
+	$pkgname-readline
+	$pkgname-test-unit:test_unit
+	$pkgname-libs"
+# jruby (launch script): https://github.com/jruby/jruby/pull/1860
+source="https://s3.amazonaws.com/jruby.org/downloads/$pkgver/$pkgname-bin-$pkgver.tar.gz
+	jruby"
+builddir="$srcdir/$pkgname-$pkgver"
+
+_destdir="/usr/share/$pkgname"
+_bindir="$_destdir/bin"
+_rubydir="$_destdir/lib/ruby"
+_gemdir="$_rubydir/gems/shared"
+_stdlibdir="$_rubydir/stdlib"
+
+prepare() {
+	cd "$builddir"/bin
+	rm *.bat *.dll *.exe
+	rm jirb_swing jruby jruby200.sh jruby.*
+
+	cd "$builddir"/lib/ruby/stdlib
+	rm -r win32 Win32API.rb
+
+	# Remove useless native binaries from JARs.
+	zip -qd jline/jline/*/jline-*.jar META-INF/native/*
+	zip -qd "$builddir"/lib/jruby.jar jni/*
+}
+
+check() (
+	cd "$srcdir"
+
+	export JRUBY_HOME="$builddir"
+	sh jruby --version
+	sh jruby -e 'puts "Hello, world!"'
+)
+
+package() {
+	cd "$builddir"
+
+	install -m644 -D "$builddir"/lib/jruby.jar \
+		"$pkgdir"$_destdir/lib/jruby.jar
+
+	install -m755 -D "$srcdir"/jruby "$pkgdir"$_bindir/jruby
+
+	# Some of the below copied files will be moved to subpackages by split functions.
+
+	install -dm755 "$pkgdir"$_rubydir
+	cp -r lib/ruby/gems lib/ruby/stdlib "$pkgdir"$_destdir/lib/ruby/
+
+	cp bin/* "$pkgdir"$_bindir/
+
+	install -dm755 "$pkgdir"/usr/bin
+	local file; for file in jgem jirb jruby jrubyc; do
+		ln -sf $_bindir/$file "$pkgdir"/usr/bin/$file
+	done
+
+	install -m644 -D COPYING "$pkgdir"/usr/share/licenses/$pkgname/COPYING
+}
+
+did_you_mean() {
+	pkgdesc="Did you mean? experience in JRuby"
+	depends="$pkgname"
+
+	_mvgem did_you_mean
+}
+
+irb() {
+	pkgdesc="Interactive JRuby console"
+	depends="$pkgname $pkgname-readline"
+
+	_mvgem irb
+	_mv $_bindir/irb usr/bin/jirb
+}
+
+minitest() {
+	pkgdesc="Ruby testing tool supporting TDD, BDD, mocking, and benchmarking"
+	depends="$pkgname"
+
+	_mvgem minitest
+}
+
+net_telnet() {
+	pkgdesc="Telnet client functionality for JRuby"
+	depends="$pkgname"
+
+	_mvgem net-telnet
+}
+
+power_assert() {
+	pkgdesc="Power Assert for JRuby"
+	depends="$pkgname"
+
+	_mvgem power_assert
+}
+
+rake() {
+	pkgdesc="Ruby based make-like utility."
+	depends="$pkgname"
+
+	_mvgem rake
+	_mv $_bindir/rake
+}
+
+rdoc() {
+	pkgdesc="Ruby documentation tool"
+	depends="$pkgname $pkgname-irb"
+
+	_mvgem rdoc
+	_mv $_bindir/rdoc $_bindir/ri
+}
+
+readline() {
+	pkgdesc="Readline support for JRuby"
+	depends="$pkgname java-jansi-native"
+
+	_mv $_stdlibdir/jline
+	mv "$pkgdir"$_stdlibdir/readline* "$subpkgdir"$_stdlibdir/
+}
+
+test_unit() {
+	pkgdesc="Legacy xUnit family unit testing framework for JRuby"
+	depends="$pkgname $pkgname-power_assert"
+
+	_mvgem test-unit
+	_mv $_stdlibdir/test $_bindir/testrb
+}
+
+libs() {
+	pkgdesc="JRuby's standard libraries"
+	depends=""
+
+	_mv $_rubydir/gems $_rubydir/stdlib
+}
+
+
+_mv() {
+	local path; for path in "$@"; do
+		mkdir -p "$subpkgdir"/${path%/*}
+		mv "$pkgdir"/$path "$subpkgdir"/${path%/*}/
+	done
+}
+
+_mvgem() {
+	local name="$1"
+	local file
+
+	cd "$pkgdir"
+	for file in ./$_stdlibdir/$name.rb \
+			./$_stdlibdir/$name \
+			./$_gemdir/gems/$name-* \
+			./$_gemdir/specifications/default/$name-*; do
+		[ -e "$pkgdir"/$file ] || continue
+		_mv "$file"
+	done
+}
+
+sha512sums="ef88f613ada2665d4f63b2e2f15594739de8ba501406e76de417821f44847b0e258524687b0ae0cf5b737520aa4dd9bb59d80a4b89a81408cda638f28bebbead  jruby-bin-9.1.13.0.tar.gz
+f2906a0136f437eaa119eae26d93b1a8e3411bc4ccee9453debf7a5d57bce767100b36a660db42184fd8398ff258455c3f2a8ef1082c907285b48d1b9b218bc2  jruby"

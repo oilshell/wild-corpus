@@ -1,0 +1,51 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=myrepos
+pkgver=1.20170129
+pkgrel=1
+pkgdesc="A multiple repository management tool"
+url="https://git.joeyh.name/git/myrepos.git"
+arch="noarch"
+license="GPL2+"
+depends="perl git"
+depends_dev=""
+makedepends=""
+replaces="mr"
+install=""
+subpackages="$pkgname-doc"
+source="https://git.joeyh.name/index.cgi/myrepos.git/snapshot/myrepos-${pkgver}.tar.gz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	install -Dm755 mr "$pkgdir"/usr/bin/mr || return 1
+	cd "$builddir"/lib
+	for file in git-fake-bare git-svn unison; do
+		install -Dpm 0644 $file \
+			"$pkgdir"/usr/share/$pkgname/$file  || return 1
+	done
+}
+
+check() {
+	cd "$builddir"
+	make test || return 1
+}
+
+doc() {
+    cd "$builddir"
+    mkdir -p "$subpkgdir"/usr/share/man || return 1
+    mv "$builddir"/*.1 "$subpkgdir"/usr/share/man/ || return 1
+	# Sample configuration files
+	for file in mrconfig mrconfig.complex; do
+		install -Dpm 0644 $file \
+			"$subpkgdir"/usr/share/doc/$pkgname/$file  || return 1
+	done
+    default_doc
+}
+
+sha512sums="cada56e811bff72dbd6161cdd843760d0aa34ab052e5ae6e210f1da0ff92f454246ed65399271892019a7ec2212180080a50251ed056cd49fe56e742394d7127  myrepos-1.20170129.tar.gz"

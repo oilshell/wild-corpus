@@ -1,0 +1,44 @@
+# Maintainer:
+# Contributor: Bartłomiej Piotrowski <bpiotrowski@alpinelinux.org>
+pkgname=libatomic_ops
+pkgver=7.4.6
+pkgrel=0
+pkgdesc="Provides semi-portable access to hardware provided atomic memory operations"
+arch="all"
+url="https://github.com/ivmai/libatomic_ops"
+license="GPL2"
+makedepends=""
+subpackages="$pkgname-dev $pkgname-doc"
+source="$url/releases/download/v$pkgver/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/"$pkgname-$pkgver
+
+case "$CARCH" in
+s390x) options="!check" ;; # FIXME
+esac
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		--enable-shared \
+		--disable-static
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+	install -Dm644 doc/LICENSING.txt "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+}
+
+sha512sums="29c6f937aa5d21343741aa0661aaf33ec9196b7784b7165d40dd87ce7bf8a7691f5ba94040663f078465ded1935ca01bb829a4b56b190f9db63cc141515d9819  libatomic_ops-7.4.6.tar.gz"

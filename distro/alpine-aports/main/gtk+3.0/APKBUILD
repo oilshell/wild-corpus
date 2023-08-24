@@ -1,0 +1,83 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=gtk+3.0
+pkgver=3.22.21
+pkgrel=0
+pkgdesc="The GTK+ Toolkit (v3)"
+url="http://www.gtk.org/"
+install="$pkgname.post-install $pkgname.post-upgrade $pkgname.post-deinstall"
+arch="all"
+license="LGPL"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+depends="shared-mime-info gtk-update-icon-cache"
+
+replaces="gtk+"
+replaces_dev="gtk+-dev"
+replaces_doc="gtk+-doc"
+
+depends_dev="
+	at-spi2-atk-dev
+	atk-dev
+	cairo-dev
+	fontconfig-dev
+	gdk-pixbuf-dev
+	glib-dev
+	intltool
+	libepoxy-dev
+	libx11-dev
+	libxcomposite-dev
+	libxcursor-dev
+	libxdamage-dev
+	libxext-dev
+	libxfixes-dev
+	libxi-dev
+	libxinerama-dev
+	libxrandr-dev
+	pango-dev
+	"
+makedepends="
+	$depends_dev
+	cups-dev
+	expat-dev
+	gettext-dev
+	gnutls-dev
+	gobject-introspection-dev
+	libice-dev
+	tiff-dev
+	zlib-dev"
+source="http://ftp.gnome.org/pub/gnome/sources/gtk+/${pkgver%.*}/gtk+-$pkgver.tar.xz"
+
+
+builddir="$srcdir"/gtk+-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--localstatedir=/var \
+		--enable-xkb \
+		--enable-xinerama \
+		--enable-xrandr \
+		--enable-xfixes \
+		--enable-xcomposite \
+		--enable-xdamage \
+		--enable-x11-backend \
+		|| return 1
+
+	# https://bugzilla.gnome.org/show_bug.cgi?id=655517
+	sed -i 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool || return 1
+
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install || return 1
+
+	# use gtk-update-icon-cache from gtk+2.0 for now
+	rm "$pkgdir"/usr/bin/gtk-update-icon-cache
+}
+
+sha512sums="478ea741e14eb54a6092ab343a5b66aa0d5369c5a1bb31b73a23ef7240d8ae432d87e04d5be1f1a500da77c52cc89639b06772f8c2831562b950aa5d4e045fad  gtk+-3.22.21.tar.xz"

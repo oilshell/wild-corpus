@@ -1,0 +1,39 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=exiv2
+pkgver=0.25
+pkgrel=0
+pkgdesc="Exif and Iptc metadata manipulation library and tools."
+url="http://exiv2.org"
+arch="all"
+license="GPL2+"
+depends=""
+depends_dev="expat-dev zlib-dev"
+makedepends="$depends_dev bash"
+subpackages="$pkgname-dev $pkgname-doc"
+source="http://www.exiv2.org/exiv2-$pkgver.tar.gz
+	fix_libc_definitions.patch
+	"
+
+_builddir="$srcdir"/$pkgname-$pkgver
+prepare() {
+	default_prepare || return 1
+	cd "$_builddir"
+	update_config_sub || return 1
+}
+build() {
+	cd "$_builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		|| return 1
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" install || return 1
+}
+
+sha512sums="08d4e655ffdde715e0214f4bef01d55aba9b8ba517456a60e254a0f8541c20479e407545db28ca90a69dee8def6941fdd88f9a557fb382ebebe49e363aca8e8e  exiv2-0.25.tar.gz
+06801f1d71d2ac8613c568eb6950776725eb4c06dc424fb9c540516fe31b15c811679c615fba18a3fbc4fac7314020b9bccb8176630bf7de3d75098e5a8d1d81  fix_libc_definitions.patch"

@@ -1,0 +1,46 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py-alabaster
+_pkgname=alabaster
+pkgver=0.7.10
+pkgrel=0
+pkgdesc="Modified Kr Sphinx doc theme"
+url="https://github.com/bitprophet/alabaster"
+arch="noarch"
+license="BSD"
+depends=""
+makedepends="python2-dev python3-dev py-setuptools"
+subpackages="py2-${pkgname#py-}:_py2 py3-${pkgname#py-}:_py3"
+source="$_pkgname-$pkgver.tar.gz::https://github.com/bitprophet/$_pkgname/archive/$pkgver.tar.gz"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python2 setup.py build || return 1
+	python3 setup.py build || return 1
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	depends="$depends $python"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+sha512sums="275329666361dcd049bacfd3cd27666fd757b748d032386f4cccccb2791e61daadadaefcd948286f1448e9830c1b970252f776430c25ab52282f59e051c9110d  alabaster-0.7.10.tar.gz"

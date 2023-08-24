@@ -1,0 +1,59 @@
+# Contributor: Valery Kartel <valery.kartel@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=cmake
+pkgver=3.9.3
+pkgrel=0
+pkgdesc="CMake is a cross-platform open-source make system"
+url="http://www.cmake.org"
+arch="all"
+license="CMake"
+makedepends="ncurses-dev curl-dev expat-dev zlib-dev bzip2-dev libarchive-dev
+    libuv-dev xz-dev rhash-dev"
+options="!checkroot !check"
+checkdepends="musl-utils file"
+subpackages="$pkgname-doc"
+
+case $pkgver in
+*.*.*.*) _v=v${pkgver%.*.*};;
+*.*.*) _v=v${pkgver%.*};;
+esac
+
+source="http://www.cmake.org/files/$_v/cmake-${pkgver}.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+parallel_opt() {
+	local i n
+	for i in $MAKEOPTS; do
+		case "$i" in
+			-j*) n=${i#-j};;
+		esac;
+	done
+	[ -n "$n" ] && echo "--parallel $n"
+}
+
+build() {
+	cd "$builddir"
+	# jsoncpp needs cmake to build so to avoid recursive build
+	# dependency, we use the bundled version of jsoncpp
+	./bootstrap --prefix=/usr \
+		--mandir=/share/man \
+		--datadir=/share/$pkgname \
+		--docdir=/share/doc/$pkgname \
+		--system-libs \
+		--no-system-jsoncpp \
+		$(parallel_opt)
+
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE bin/ctest
+}
+
+package() {
+	cd $startdir/src/$pkgname-$pkgver
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="30058cf4c154221846d1cd22eaf44a297d2a2d020a443f3e6f40384dfb86ee9a639a1299aa9f187f230505b2a6ee0fe69fbf5e80410711a6ac3d7a07b37f8dfc  cmake-3.9.3.tar.gz"

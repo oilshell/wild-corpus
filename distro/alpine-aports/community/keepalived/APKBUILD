@@ -1,0 +1,107 @@
+# Contributor: Pablo Castorino <pcastorino@mendoza-conicet.gob.ar>
+# Contributor: Jakub Jirutka <jakub@jirutka.cz>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=keepalived
+pkgver=1.3.7
+pkgrel=0
+pkgdesc="Health Checking for Linux Virtual Server & High-Availability"
+url="http://www.keepalived.org/"
+arch="all"
+license="GPL"
+depends="$pkgname-common !$pkgname-snmp"
+makedepends="libressl-dev popt-dev linux-headers net-snmp-dev libnl-dev
+	libnfnetlink-dev automake autoconf"
+install="$pkgname.post-upgrade"
+subpackages="$pkgname-doc $pkgname-sample-config:samples:noarch
+	$pkgname-common $pkgname-snmp"
+source="http://www.keepalived.org/software/$pkgname-$pkgver.tar.gz
+	$pkgname.initd
+	$pkgname.confd
+	"
+builddir="$srcdir/$pkgname-$pkgver"
+
+prepare() {
+	default_prepare
+
+	# The build scripts are somehow broken, so we must regenerate them.
+	autoreconf -fiv
+
+	cp -ar "$builddir" "$builddir-snmp"
+}
+
+build() {
+	cd "$builddir-snmp"
+	_build --enable-snmp
+
+	cd "$builddir"
+	_build
+}
+
+_build() {
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--localstatedir=/var \
+		--with-kernel-dir=/usr/include/linux \
+		--enable-vrrp \
+		--enable-sha1 \
+		$@
+	make
+}
+
+check() {
+	"$builddir"/bin/keepalived --version
+	"$builddir-snmp"/bin/keepalived --version
+}
+
+package() {
+	cd "$builddir"
+
+	make DESTDIR="$pkgdir" install
+
+	local f; for f in AUTHOR CONTRIBUTORS ChangeLog README INSTALL TODO \
+			genhash/README genhash/AUTHOR genhash/ChangeLog; do
+		install -m644 -D $f "$pkgdir"/usr/share/doc/$pkgname/$f
+	done
+
+	install -m755 -D "$srcdir"/$pkgname.initd "$pkgdir"/etc/init.d/$pkgname
+	install -m644 -D "$srcdir"/$pkgname.confd "$pkgdir"/etc/conf.d/$pkgname
+
+	# Clean up sysvinit files
+	rm -rf "$pkgdir"/etc/rc.d "$pkgdir"/etc/sysconfig
+}
+
+common() {
+	depends=""
+
+	mkdir -p "$subpkgdir"/usr
+
+	mv "$pkgdir"/etc "$subpkgdir"/
+	mv "$pkgdir"/usr/bin "$subpkgdir"/usr/
+}
+
+snmp() {
+	pkgdesc="$pkgdesc (with SNMP support)"
+	depends="$pkgname-common !$pkgname"
+
+	cd "$builddir-snmp"
+
+	install -m700 -D bin/keepalived "$subpkgdir"/usr/sbin/keepalived
+
+	mkdir -p "$subpkgdir"/usr/share/snmp/mibs
+	install -m644 doc/*-MIB.txt "$subpkgdir"/usr/share/snmp/mibs/
+}
+
+samples() {
+	pkgdesc="Sample configuration for keepalived"
+
+	mkdir -p "$subpkgdir"/etc/keepalived/
+	mv "$pkgdir"/etc/keepalived/samples "$subpkgdir"/etc/keepalived/
+}
+
+sha512sums="61ea5a6914325dc69d3951330fc1332a08bf2073e079c6ea14ee9dee44a772ba2fd10fc61701c668ae5dcfd739c451d421bde9a73abbed6f76a9085b235cb077  keepalived-1.3.7.tar.gz
+12361313dd044269150c9ea1a4ffc6987075b0106dfdd4b3804b1852d2a47f608d954ab473419474747b475c98fade3779800be8147134969016817cfa050ee4  keepalived.initd
+413cb05aa2d1d8c0f552398bb5d511ee022b4d07f5b18217350c1159d013f2d26d87ae63d2977329ec78d7416760e84c4048a5ad20a1f63ef2bc3a1a84c3a41a  keepalived.confd"

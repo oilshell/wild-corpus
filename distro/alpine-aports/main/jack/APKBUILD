@@ -1,0 +1,68 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=jack
+_realname=jack2
+pkgver=1.9.10
+pkgrel=5
+pkgdesc="The Jack Audio Connection Kit"
+url="http://www.jackaudio.org"
+arch="all"
+license="GPLv2 GPLv2+ LGPLv2+"
+depends=""
+depends_dev=""
+makedepends="$depends_dev alsa-lib-dev dbus-dev expat-dev libsamplerate-dev
+	libsndfile-dev ncurses-dev readline-dev python2"
+install=""
+subpackages="$pkgname-dev $pkgname-doc $pkgname-dbus $pkgname-example-clients:_clients"
+source="$pkgname-$pkgver.tar.gz::https://github.com/jackaudio/jack2/archive/v${pkgver}.tar.gz
+	fix-execinfo.patch
+	jack-gcc6.patch
+	"
+
+_builddir="$srcdir"/$_realname-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+	sed -i -e '1s:#!/bin/bash:!#/bin/sh:' svnversion_regenerate.sh
+}
+
+build() {
+	cd "$_builddir"
+	./waf configure \
+		-j1 \
+		--prefix=/usr \
+		--mandir=/usr/share/man/man1 \
+		--libdir=/usr/lib \
+		--dbus \
+		--alsa \
+		--classic \
+		|| return 1
+
+	./waf build -j${JOBS:-2} -v || return 1
+}
+
+package() {
+	cd "$_builddir"
+	./waf --destdir="$pkgdir" install || return 1
+}
+
+dbus() {
+	pkgdesc="Jack D-Bus launcher"
+	mkdir -p "$subpkgdir"/usr/bin "$subpkgdir"/usr/share
+	mv "$pkgdir"/usr/bin/jackdbus "$subpkgdir"/usr/bin/ || return 1
+	mv "$pkgdir"/usr/share/dbus* "$subpkgdir"/usr/share/|| return 1
+}
+
+_clients() {
+	pkgdesc="Example clients that use Jack"
+	mkdir -p "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/bin/*_* "$subpkgdir"/usr/bin/
+}
+
+sha512sums="0bee815356e9e572224e7cc484c402f38797d70257c4bc79a47552ae30a25a4600c61f712a73cbbede52cd8cb8dc144c9334e28c10e23354a11b7223ee0bb0ca  jack-1.9.10.tar.gz
+b5abec7e67485d1c13f399b5961539177dd35d21c5dd95e0aa767adb0f5b1e588e9ca2f9b29cc4d66fc039311ff7eacc4cf21f6700ef0a2c8de99b63cb00f84d  fix-execinfo.patch
+31bc3451c9df0700632d1d29fe22da072f8e195cc3bcfef847867dda3d54e6636b3557b10e623a126f614e6b4b5250d02f5cfbda6b57dd341fe6b09319121675  jack-gcc6.patch"

@@ -1,0 +1,57 @@
+# Contributor: Natanael Copa <ncopa@alpinelinux.org>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=keyutils
+pkgver=1.5.10
+pkgrel=0
+pkgdesc="Linux Key Management Utilities"
+url="http://people.redhat.com/~dhowells/keyutils/"
+arch="all"
+license="GPL2+ LGPL2+"
+depends=""
+makedepends="file linux-headers"
+install=""
+subpackages="$pkgname-dev $pkgname-doc $pkgname-libs"
+source="http://people.redhat.com/~dhowells/keyutils/keyutils-$pkgver.tar.bz2
+	fix-includes.patch
+	"
+
+_builddir="$srcdir"/keyutils-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	make -j1 \
+		NO_ARLIB=1 \
+		LIBDIR=/lib \
+		USRLIBDIR=/usr/lib \
+		VERSION=$pkgver \
+		RELEASE=-r$pkgrel \
+		CFLAGS="$CFLAGS" \
+		|| return 1
+}
+
+package() {
+	cd "$_builddir"
+	make DESTDIR="$pkgdir" \
+		NO_ARLIB=1 \
+		LIBDIR=/lib \
+		USRLIBDIR=/usr/lib \
+		install || return 1
+}
+
+libs() {
+	pkgdesc="Key utilities library"
+	mkdir -p "$subpkgdir"
+	mv "$pkgdir"/lib "$subpkgdir"/
+}
+
+sha512sums="7f6f956c7e76cdc2aeb52e74fe670b20a5f9a5d9b543fd2ce971d80c48745f37d05235a42f0a8f152b1128a109c7d8bf07e751282a20d2d3f433a99a5308ae8d  keyutils-1.5.10.tar.bz2
+e7a913c97c4116e5f4b7fdf4d071835dcf05a7aa4ce782fd717e4694414023fb3ed88b8a15710b15869545046e99f706fe8476f9d4fe6578d2eae571e1ed8103  fix-includes.patch"

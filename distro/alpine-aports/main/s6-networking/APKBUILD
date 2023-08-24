@@ -1,0 +1,40 @@
+# Maintainer: Laurent Bercot <ska-devel@skarnet.org>
+# Contributor: John Regan <john@jrjrtech.com>
+pkgname=s6-networking
+pkgver=2.3.0.2
+pkgrel=0
+pkgdesc="skarnet.org's UCSPI Unix and TCP tools, access control tools, and network time management utilities."
+url="http://skarnet.org/software/$pkgname/"
+arch="all"
+license="ISC"
+options="!check"
+makedepends="skalibs-dev execline-dev s6-dev s6-dns-dev libressl libressl-dev"
+subpackages="$pkgname-dev $pkgname-doc"
+source="http://skarnet.org/software/$pkgname/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--enable-shared \
+		--enable-static \
+		--disable-allstatic \
+		--prefix=/usr \
+		--libexecdir="/usr/lib/$pkgname" \
+		--with-dynlib=/lib \
+		--enable-ssl=libressl
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+doc() {
+	default_doc
+	mkdir -p "$subpkgdir/usr/share/doc"
+	cp -a "$builddir/doc" "$subpkgdir/usr/share/doc/$pkgname"
+}
+
+sha512sums="c99afd9bdbd5003f57de8f88f091971f0269cd8efee5791c3c4aa90ad34b978d0f57724d4128e9d20d6a40d731853bb4bdaa76dd860f975ff7f84a56b0050256  s6-networking-2.3.0.2.tar.gz"

@@ -1,0 +1,79 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=cups-filters
+pkgver=1.17.8
+pkgrel=0
+pkgdesc="OpenPrinting CUPS filters and backends"
+url="http://www.linuxfoundation.org/collaborate/workgroups/openprinting/pdf_as_standard_print_job_format"
+arch="all"
+license="GPLv2 and GPLv2+ and GPLv3 and MIT"
+# while textonly is originally a bash script, it only needs a few changes
+# to work with any shell (dash being the problematic one)
+# foomatic-rip needs "a modern shell" in case the PPD requires some
+# newer constructs; bash, ksh, and zsh are documented as working,
+# and busybox ash supports most of what bash does
+# texttops/textopdf need FreeMono from ttf-freefont
+# for text printing to work
+depends="poppler-utils bc ttf-freefont"
+depends_dev=""
+makedepends="$depends_dev bash cups-dev libjpeg-turbo-dev poppler-dev zlib-dev
+	libpng-dev tiff-dev lcms2-dev freetype-dev ghostscript-dev
+	fontconfig-dev qpdf-dev avahi-dev dbus-dev linux-headers mupdf-tools
+	coreutils"
+install=""
+subpackages="$pkgname-dev $pkgname-doc $pkgname-libs"
+source="http://www.openprinting.org/download/cups-filters/cups-filters-$pkgver.tar.xz
+	"
+
+_builddir="$srcdir"/cups-filters-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+}
+
+build() {
+	cd "$_builddir"
+	./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--sysconfdir=/etc \
+		--mandir=/usr/share/man \
+		--infodir=/usr/share/info \
+		--localstatedir=/var \
+		--disable-static \
+		--with-pdftops=pdftops \
+		--with-shell=/bin/sh \
+		--without-rcdir \
+		--without-rclevels \
+		|| return 1
+	# workaround parallel build issue by building libcupsfilters.la first
+	make libcupsfilters.la && make libfontembed.la && make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make -j1 DESTDIR="$pkgdir" install || return 1
+	#the pdf.utf-8 symlink isn't quite good enough
+	cd "$pkgdir"/usr/share/cups/charsets && \
+	ln -s pdf.utf-8.simple pdf.UTF-8 || return 1
+}
+
+dev() {
+	default_dev
+	# cupsfilters.drv needs pcl.h
+	install -Dm644 "$_builddir"/filter/pcl.h \
+		"$pkgdir"/usr/share/cups/ppdc/pcl.h
+}
+
+libs() {
+	pkgdesc="OpenPrinting CUPS filters and backends - cupsfilters and fontembed libraries"
+	install -d "$subpkgdir"/usr/lib
+	mv "$pkgdir"/usr/lib/lib*.so.* "$subpkgdir"/usr/lib/
+}
+
+sha512sums="01f4499fb1db456a1fb11b8e39b5de273229c7aa2f87d079e237501ccd70bf637ca5e15d19fb9f7930be700ab6958e1a597bda8d0970260b5e7577eb5447f797  cups-filters-1.17.8.tar.xz"

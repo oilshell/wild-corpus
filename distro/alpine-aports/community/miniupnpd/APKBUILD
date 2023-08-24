@@ -1,0 +1,65 @@
+# Contributor: Carlo Landmeter <clandmeter@gmail.com>
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=miniupnpd
+pkgver=2.0.20170421
+pkgrel=0
+pkgdesc="Lightweight UPnP IGD daemon"
+url="http://miniupnp.free.fr"
+arch="all"
+license="BSD"
+depends=""
+depends_dev="libnfnetlink-dev iptables-dev"
+makedepends="$depends_dev bsd-compat-headers"
+install=""
+subpackages="$pkgname-doc"
+source="http://miniupnp.free.fr/files/miniupnpd-$pkgver.tar.gz
+	$pkgname.initd
+	$pkgname.confd"
+
+_builddir="$srcdir"/miniupnpd-$pkgver
+prepare() {
+	local i
+	cd "$_builddir"
+	for i in $source; do
+		case $i in
+		*.patch) msg $i; patch -p1 -i "$srcdir"/$i || return 1;;
+		esac
+	done
+	mv Makefile.linux Makefile
+	sed -i \
+		-e "s#^CFLAGS = .*-D#CPPFLAGS += -I/usr/include -D#" \
+		-e '/^CFLAGS :=/s/CFLAGS/CPPFLAGS/g' \
+		-e "s/CFLAGS += -ansi/#CFLAGS += -ansi/g" \
+		-e "s/LIBS = -liptc/LIBS = -lip4tc/g" \
+		-e 's/genuuid||//' \
+		-e "s/--mode=/-m /g" \
+		Makefile || die
+	sed -i \
+		-e 's/\(strncpy(\([->a-z.]\+\), "[a-zA-Z]\+", \)IPT_FUNCTION_MAXNAMELEN);/\1sizeof(\2));/' \
+		netfilter/iptcrdr.c || die
+
+	make config.h
+
+	sed -i \
+		-e 's/\/\*#define ENABLE_LEASEFILE\*\//#define ENABLE_LEASEFILE/g' \
+		config.h || die
+}
+
+build() {
+	cd "$_builddir"
+	make || return 1
+}
+
+package() {
+	cd "$_builddir"
+	make PREFIX="$pkgdir/" install || return 1
+	install -m755 -D "$srcdir"/$pkgname.initd \
+		"$pkgdir"/etc/init.d/$pkgname || return 1
+	install -m644 -D "$srcdir"/$pkgname.confd \
+		"$pkgdir"/etc/conf.d/$pkgname || return 1
+
+}
+
+sha512sums="ed18e8e9223b61d67125234f060e948f21d957a6d9f4a45c2b2e220f333c7c788f586076212e68245f43379901ae86a33af3bc35795fa2e568570339cc02e855  miniupnpd-2.0.20170421.tar.gz
+a25b2a444cde623fbdbe6fb26c544614cceb2cc1262a0409f40286f4c69b70ba1c05e55815552a12b0624b16ddd48d3e424dad18b278ff9da04bac335feb1d45  miniupnpd.initd
+81aa2dac0643bbd1331549427c438900319adce91928b6bad6f7d470492f6f48e04e4d1af89f961db53fc132a7ff89ea52625441f051afd5a1b48680917f4ff7  miniupnpd.confd"

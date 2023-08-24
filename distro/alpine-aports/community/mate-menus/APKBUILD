@@ -1,0 +1,36 @@
+# Contributor: Alan Lacerda <alacerda@alpinelinux.org>
+# Maintainer: Alan Lacerda <alacerda@alpinelinux.org>
+pkgname=mate-menus
+pkgver=1.18.0
+pkgrel=1
+pkgdesc="The libmate-menu library, the layout configuration files for the MATE menu, as well as a simple menu editor"
+url="https://github.com/mate-desktop/mate-menus"
+arch="all"
+license="GPL2"
+depends="mate-common"
+makedepends="libtool intltool glib-dev"
+subpackages="$pkgname-dev $pkgname-lang"
+source="http://pub.mate-desktop.org/releases/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	./configure \
+		--build=$CBUILD \
+		--sysconfdir=/etc \
+		--host=$CHOST \
+		--prefix=/usr
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="0c9d8162f67208cecead4e2dcaf4eddf63b10484396e1b28381d98607de007c5aaf1126f36400183d8545ea21c6273f5df48b4f47847fba2470d92d9943a123b  mate-menus-1.18.0.tar.xz"

@@ -1,0 +1,28 @@
+# Contributor: Leonardo Arena <rnalrd@alpinelinux.org>
+# Maintainer:  Leonardo Arena <rnalrd@alpinelinux.org>
+pkgname=perl-unix-syslog
+_realname=Unix-Syslog
+pkgver=1.1
+pkgrel=9
+pkgdesc="Perl interface to the UNIX syslog(3) calls"
+url="http://search.cpan.org/~mharnisch/Unix-Syslog-1.1/"
+arch="all"
+license="unknown"
+depends="perl"
+makedepends="perl-dev"
+install=
+subpackages="$pkgname-doc"
+source="http://search.cpan.org/CPAN/authors/id/M/MH/MHARNISCH/$_realname-$pkgver.tar.gz"
+
+build() {
+	cd "$srcdir/$_realname-$pkgver"
+
+	PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor \
+		|| return 1
+	make || return 1
+	make DESTDIR="$pkgdir" install
+	# creates file collision among perl modules
+	find "$pkgdir" -name perllocal.pod -delete
+}
+
+sha512sums="cb1ea3846844b7c82e081f3bb778c698b681d1875b83201b1beef2267a288890c6fc62af8edbfbc04553a9caa1ebafa429130e784f31c9531719b11a4c47c3ba  Unix-Syslog-1.1.tar.gz"

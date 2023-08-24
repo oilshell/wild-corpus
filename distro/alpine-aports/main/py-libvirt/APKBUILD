@@ -1,0 +1,52 @@
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=py-libvirt
+_pkgname=libvirt-python
+pkgver=3.7.0
+pkgrel=0
+pkgdesc="The libvirt virtualization API python binding"
+url="http://libvirt.org"
+arch="all"
+license="LGPLv2+"
+makedepends="python2-dev python3-dev libvirt-dev"
+subpackages="py3-${pkgname#py-}:_py3 py2-${pkgname#py-}:_py2"
+source="http://libvirt.org/sources/python/$_pkgname-$pkgver.tar.gz
+	musl-gnuc-prereq.patch
+	"
+builddir="$srcdir/$_pkgname-$pkgver"
+
+check() {
+	cd "$builddir"
+	python2 setup.py check
+	python3 setup.py check
+}
+
+build() {
+	cd "$builddir"
+	python2 setup.py build
+	python3 setup.py build
+}
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+_py() {
+	local python="$1"
+	pkgdesc="$pkgdesc (for $python)"
+	install_if="$pkgname=$pkgver-r$pkgrel $python"
+
+	cd "$builddir"
+	$python setup.py install --prefix=/usr --root="$subpkgdir"
+}
+
+_py2() {
+	replaces="$pkgname"
+	_py python2
+}
+
+_py3() {
+	_py python3
+}
+
+sha512sums="2f37d860d9ee203af3765a1b8d7f8981a8e51b5e6c78170d4bd80d0b23b9f5997725d81ff8c4ed4e5bb218346913321a3b4b8e2d337fd3cb8eeb95ac78256413  libvirt-python-3.7.0.tar.gz
+8aa1d814f8388ebff0736ee138c780323381cd4cf39b4a4faed2e2a1fe5911facc34505a85b0977d8b4240b8ce2f4a6d0414790693c4f45ff7d9592e9d6a3ff8  musl-gnuc-prereq.patch"

@@ -1,0 +1,26 @@
+# Contributor: Fabian Affolter <fabian@affolter-engineering.ch>
+# Maintainer: Fabian Affolter <fabian@affolter-engineering.ch>
+pkgname=py3-aiohttp-session
+_pkgname=aiohttp_session
+pkgver=1.0.1
+pkgrel=0
+pkgdesc="Sessions support for aiohttp"
+url="http://aiohttp-session.readthedocs.io/"
+arch="noarch"
+license="ASL 2.0"
+depends="py3-aiohttp"
+makedepends="python3-dev"
+source="${pkgname}-${pkgver}.tar.gz::https://github.com/aio-libs/aiohttp-session/archive/v1.0.1.tar.gz"
+builddir="$srcdir"/aiohttp-session-$pkgver
+
+build() {
+	cd "$builddir"
+	python3 setup.py build
+}
+
+package() {
+	cd "$builddir"
+	python3 setup.py install --prefix=/usr --root="$pkgdir"
+}
+
+sha512sums="3e3ee561737b22fb9dda25c2caa4abd009e5748fbca21f74850046a520ff0d2845b45ba0fa5eac313f11362404b3d31edc8c79644f8a2d128ad2504d9efad27f  py3-aiohttp-session-1.0.1.tar.gz"

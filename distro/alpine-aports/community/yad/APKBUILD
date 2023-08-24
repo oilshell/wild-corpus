@@ -1,0 +1,36 @@
+# Contributor: Francesco Colista <fcolista@alpinelinux.org>
+# Maintainer: Francesco Colista <fcolista@alpinelinux.org>
+pkgname=yad
+pkgver=0.39.0
+pkgrel=0
+pkgdesc="A fork of zenity - display graphical dialogs from shell scripts or command line"
+url="http://sourceforge.net/projects/yad-dialog"
+arch="all"
+license="GPL3"
+depends="hicolor-icon-theme"
+makedepends="gtk+2.0-dev intltool"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+source="http://sourceforge.net/projects/yad-dialog/files/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir"/$pkgname-$pkgver
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+build() {
+	cd "$builddir"
+	./configure \
+		--prefix=/usr \
+		--enable-icon-browser \
+		--disable-html
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+	mkdir -p "$pkgdir/usr/share/doc/$pkgname"
+}
+
+sha512sums="99b149e1f902b0c44481d12166579219e5b7ed2be2393e08f1a8a9a0baa26ca506f87e6b037e38c308e92eae0efea1e27ffa4d0bd2c41da21c81759b9bfefd34  yad-0.39.0.tar.xz"

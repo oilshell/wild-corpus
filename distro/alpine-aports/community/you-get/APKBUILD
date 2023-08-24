@@ -1,0 +1,30 @@
+# Contributor: Ivan Tham <pickfire@riseup.net>
+# Maintainer: Ivan Tham <pickfire@riseup.net>
+pkgname=you-get
+pkgver=0.4.915
+pkgrel=0
+pkgdesc="Tiny command line utility to download media contents"
+url="https://you-get.org/"
+arch="noarch"
+license="MIT"
+depends="python3"
+makedepends="python3-dev"
+source="https://files.pythonhosted.org/packages/source/${pkgname:0:1}/$pkgname/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/$pkgname-$pkgver"
+
+build() {
+	cd "$builddir"
+	python3 setup.py build
+}
+
+check() {
+	cd "$builddir"
+	python3 setup.py check
+}
+
+package() {
+	cd "$builddir"
+	python3 setup.py install --prefix=/usr --root="$pkgdir"
+}
+
+sha512sums="74571d7cccbc0f5fa70e7848c0ba54ea0232a47cfb957d0265072ce82861d513c62cd9b4f072669ecc976da82908eb2abce6e87b1c2c040949a59e6093238fa6  you-get-0.4.915.tar.gz"

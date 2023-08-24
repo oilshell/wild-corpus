@@ -1,0 +1,84 @@
+# Maintainer: Natanael Copa <ncopa@alpinelinux.org>
+pkgname=inkscape
+pkgver=0.92.1
+pkgrel=1
+pkgdesc="A vector-based drawing program - svg compliant"
+url="http://inkscape.sourceforge.net/"
+arch="all"
+license="GPL LGPL"
+makedepends="
+	autoconf
+	automake
+	boost-dev
+	dbus-dev
+	gc-dev
+	gsl-dev
+	gtkmm-dev
+	gtkspell-dev
+	imagemagick-dev
+	lcms-dev
+	libtool
+	libxml2-dev
+	libxslt-dev
+	poppler-dev
+	popt-dev
+	tar
+	"
+depends="desktop-file-utils"
+checkdepends="bash"
+subpackages="$pkgname-doc $pkgname-lang $pkgname-view"
+source="https://launchpad.net/inkscape/${pkgver%.*}.x/$pkgver/+download/inkscape-$pkgver.tar.bz2
+	fix-crash.patch
+	"
+builddir="$srcdir"/$pkgname-$pkgver
+
+prepare() {
+	default_prepare
+	./autogen.sh
+	#aclocal -I m4 && autoconf && automake -a && autoheader
+	# we enable fortify source by default so to silence warnings we
+	# remove it from cmdline
+	sed -i -e '/CPPFLAGS=/s/-D_FORTIFY_SOURCE=2//' configure
+}
+
+build() {
+	cd "$builddir"
+	CXXFLAGS="$CXXFLAGS -std=c++11" ./configure \
+		--build=$CBUILD \
+		--host=$CHOST \
+		--prefix=/usr \
+		--without-gnome-vfs \
+		--enable-lcms \
+		--enable-poppler-cairo \
+		--enable-dbusapi \
+		--disable-strict-build
+	make
+}
+
+check() {
+	cd "$builddir"
+	make check
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+view() {
+	pkgdesc="Viewing program for SVG files"
+	mkdir -p "$subpkgdir"/usr/bin
+	mv "$pkgdir"/usr/bin/inkview "$subpkgdir"/usr/bin
+}
+
+doc() {
+	default_doc
+	mkdir -p "$subpkgdir"/usr/share/inkscape
+	mv "$pkgdir"/usr/share/inkscape/examples \
+		"$pkgdir"/usr/share/inkscape/tutorials \
+		"$subpkgdir"/usr/share/inkscape
+}
+
+sha512sums="f8f3bfb812a214216c3ffac7064a4619f847cf9810417c782481dba12e6c6a44123c8b8a9289fbf5287f2e6b6df39a641d94a000d842faee5ff808eec86187a0  inkscape-0.92.1.tar.bz2
+5611130bde0734b2dbc3d7c56c84d2ffe929f8eaaa739501a25dab6a695ef051e9acf74280479fa8e1c058a429f3f48b9800c0935ec07e81b1b86174f548cb84  fix-crash.patch"
+

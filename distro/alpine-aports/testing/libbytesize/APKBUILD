@@ -1,0 +1,26 @@
+# Contributor: André Klitzing <aklitzing@gmail.com>
+# Maintainer: André Klitzing <aklitzing@gmail.com>
+pkgname=libbytesize
+pkgver=1.2
+pkgrel=0
+pkgdesc="A tiny library providing a C 'class' for working with arbitrary big sizes in bytes"
+url="https://github.com/rhinstaller/libbytesize"
+arch="all"
+license="LGPL"
+makedepends="pcre-dev mpfr-dev gmp-dev gettext-dev bash python3"
+subpackages="$pkgname-dev $pkgname-lang"
+source="https://github.com/storaged-project/$pkgname/releases/download/$pkgver/$pkgname-$pkgver.tar.gz"
+builddir="$srcdir/"$pkgname-$pkgver
+
+build() {
+	cd "$builddir"
+	./configure --prefix=/usr
+	make
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+}
+
+sha512sums="d61ff297d1f533aee120bfcfdc3969c6a87428da322a6410707c301ff9b005da5d4f813ea15282eab5eb8435b009646d2cff29ac5247e2664af3ecaef54867a6  libbytesize-1.2.tar.gz"
